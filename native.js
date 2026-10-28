@@ -13,6 +13,8 @@ export const schedule=(reminders,settings)=>call('schedule',{reminders,settings}
 export const card=(data,restore=false)=>call('card',{card:data,restore});
 export const test=channel=>call('test',{channel});
 export const haptic=(kind='tick')=>{if(isNative)call('haptic',{kind}).catch(()=>{})};
+// Значки строки состояния и жестов следуют выбранной в приложении теме, а не только системной.
+export function barsStyle(theme){if(isNative)cap.nativePromise('SystemBars','setStyle',{style:theme==='dark'?'DARK':theme==='light'?'LIGHT':'DEFAULT'}).catch(()=>{})}
 export function onAction(handler){if(isNative)cap.nativeCallback('RitmNative','addListener',{eventName:'action'},handler)}
 
 function download(name,body,type){const url=URL.createObjectURL(new Blob([body],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}

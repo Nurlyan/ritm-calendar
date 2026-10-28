@@ -3,6 +3,13 @@
   "appName": "Ритм",
   "webDir": "www",
   "loggingBehavior": "none",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DEFAULT",
+      "initialViewportFitValueHint": "cover"
+    }
+  },
   "android": {
     "allowMixedContent": false,
     "captureInput": false,
