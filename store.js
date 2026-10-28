@@ -1,8 +1,13 @@
 import {secureGet,secureSet,isNative} from './native.js';
 const config=window.RITM_CONFIG||{};
 export const cloud=Boolean(config.supabaseUrl&&config.supabaseKey&&config.emailAccess);
+export const publicConfig={url:config.supabaseUrl,key:config.supabaseKey};
 const SESSION='ritm-session-v2';
-let user=null,role='viewer',version=-1,onChange=()=>{},timer,reading=false,sleepStamp=null,healthStamp=null;
+let user=null,role='viewer',version=-1,onChange=()=>{},timer,reading=false,sleepStamp=null,healthStamp=null,proposalStamp=null;
+// Предложения активностей от профиля просмотра; видны обоим профилям.
+export let proposals=[];
+// Незавершённая запись сна («лёг», подъём ещё не отмечен). Хранится зашифрованно только на этом телефоне.
+export let sleepOpen=null;
 export let health=[];
 // Записи дневников, которые не удалось отправить из-за сети. Хранятся зашифрованно на устройстве, отдельно для каждого профиля.
 export let queue=[];
@@ -11,6 +16,9 @@ export const session=()=>user;
 const empty=()=>({plan:{},backlog:[],history:[],sleep:[]});
 export let data=empty();
 const queueKey=()=>'ritm-queue-v1:'+(user?.email||'');
+const openKey=()=>'ritm-sleep-open:'+(user?.email||'local');
+async function loadOpen(){try{sleepOpen=JSON.parse(await secureGet(openKey()))}catch{sleepOpen=null}}
+export async function setSleepOpen(v){sleepOpen=v;await secureSet(openKey(),v?JSON.stringify(v):null)}
 async function persistQueue(){await secureSet(queueKey(),queue.length?JSON.stringify(queue):null)}
 async function loadQueue(){try{queue=JSON.parse(await secureGet(queueKey()))||[]}catch{queue=[]}}
 const offline=e=>e instanceof TypeError||e?.name==='TimeoutError'||e?.name==='AbortError';
@@ -20,10 +28,10 @@ function watch(){clearInterval(timer);timer=setInterval(tick,5000)}
 // Активный опрос идёт только при видимом экране; при возвращении в приложение данные проверяются сразу.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
 window.addEventListener('online',()=>tick());
-export async function init(callback){onChange=callback;if(!cloud){role='owner';try{health=JSON.parse(localStorage.getItem('ritm-health-v1'))||[];data=JSON.parse(localStorage.getItem('ritm-local-v1'))||empty()}catch{}return}
+export async function init(callback){onChange=callback;if(!cloud){role=new URLSearchParams(location.search).get('role')==='viewer'?'viewer':'owner';try{health=JSON.parse(localStorage.getItem('ritm-health-v1'))||[];data=JSON.parse(localStorage.getItem('ritm-local-v1'))||empty();proposals=JSON.parse(localStorage.getItem('ritm-proposals-v1'))||[]}catch{}await loadOpen();return}
  try{user=JSON.parse(await secureGet(SESSION))}catch{}
  if(isNative&&!user){try{const old=JSON.parse(localStorage.getItem(SESSION));if(old){user=old;await secureSet(SESSION,JSON.stringify(old));localStorage.removeItem(SESSION)}}catch{}}
- if(user){await loadQueue();try{await refresh();watch()}catch(e){if(e.message.includes('Сессия')){await secureSet(SESSION,null);user=null}else{watch();throw e}}}
+ if(user){await loadQueue();await loadOpen();try{await refresh();watch()}catch(e){if(e.message.includes('Сессия')){await secureSet(SESSION,null);user=null}else{watch();throw e}}}
  if(!isNative)window.addEventListener('storage',e=>{if(e.key===SESSION)location.reload()});
 }
 export async function refresh(){
@@ -32,6 +40,7 @@ export async function refresh(){
  if(version!==meta.version||sleepStamp!==meta.sleepStamp){
   const row=await rpc('ritm_read',{p_token:user.token});version=row.version;data={...empty(),...row.state,sleep:row.sleep||[]};sleepStamp=meta.sleepStamp;changed=true;
  }
+ if(proposalStamp!==meta.proposalStamp){proposals=await rpc('ritm_proposals_read',{p_token:user.token})||[];proposalStamp=meta.proposalStamp;changed=true}
  if(role==='owner'&&healthStamp!==meta.healthStamp){await loadHealth();healthStamp=meta.healthStamp;changed=true}
  if(role!=='owner'){health=[];healthStamp=null}
  else if(changed)queue.forEach(applyLocal);
@@ -57,7 +66,10 @@ export async function saveSleep(entry){if(role!=='owner')throw Error('Дневн
  if(cloud)return saveDiary({kind:'sleep',id,entry:rest,revision});
  const row={...rest,id,revision:revision+1};data={...data,sleep:[row,...data.sleep.filter(s=>s.id!==id)].sort((a,b)=>b.bed.localeCompare(a.bed))};localStorage.setItem('ritm-local-v1',JSON.stringify(data));return {queued:false}
 }
-export async function exportAll(){let history=data.history;if(cloud&&user){await refresh();try{history=await pages('ritm_history_read')}catch{}}return {schemaVersion:3,exportedAt:new Date().toISOString(),timezone:'Europe/Moscow',note:'План: минуты от полуночи МСК даты плана (значения больше 1440 — после полуночи). Фактические отметки и сон — ISO 8601 UTC.',...data,history,...(role==='owner'?{health}:{})}}
+// Предложение от профиля просмотра; повторная отправка с тем же id безопасна.
+export async function propose(p){if(role!=='viewer')throw Error('Предлагать активности может профиль просмотра');const id=p.id||crypto.randomUUID();if(cloud){try{await rpc('ritm_propose',{p_token:user.token,p_id:id,p_payload:p})}catch(e){if(offline(e))throw Error('Нет связи с базой. Предложение не отправлено — повторите, когда появится сеть.');throw e}proposalStamp=null;await refresh();return}proposals=[{...p,id,status:'pending',created_at:new Date().toISOString(),reply:''},...proposals];localStorage.setItem('ritm-proposals-v1',JSON.stringify(proposals))}
+export async function decideProposal(id,status,reply=''){if(cloud){try{await rpc('ritm_proposal_decide',{p_token:user.token,p_id:id,p_status:status,p_reply:reply})}catch(e){if(offline(e))throw Error('Нет связи с базой. Решение не отправлено — повторите, когда появится сеть.');throw e}proposalStamp=null;await refresh();return}proposals=proposals.map(p=>p.id===id?{...p,status,reply,decided_at:new Date().toISOString()}:p);localStorage.setItem('ritm-proposals-v1',JSON.stringify(proposals))}
+export async function exportAll(){let history=data.history;if(cloud&&user){await refresh();try{history=await pages('ritm_history_read')}catch{}}return {schemaVersion:3,exportedAt:new Date().toISOString(),timezone:'Europe/Moscow',note:'План: минуты от полуночи МСК даты плана (значения больше 1440 — после полуночи). Фактические отметки и сон — ISO 8601 UTC.',...data,history,proposals,...(role==='owner'?{health}:{})}}
 export async function save(next,message){if(role!=='owner')throw Error('Доступ только для просмотра');if(cloud){const {sleep,...state}=next;try{await rpc('ritm_save',{p_token:user.token,p_version:version,p_state:state,p_message:message})}catch(e){if(offline(e))throw Error('Нет связи с базой. Изменение плана не сохранено — повторите, когда появится сеть.');if(e.message.includes('другом устройстве'))await refresh();throw e}await refresh()}else{data={...next,history:[{id:crypto.randomUUID(),at:new Date().toISOString(),message},...data.history].slice(0,200)};localStorage.setItem('ritm-local-v1',JSON.stringify(data))}}
-export async function login(email){version=-1;sleepStamp=null;healthStamp=null;user=await rpc('ritm_login',{p_email:email.trim().toLowerCase()});await secureSet(SESSION,JSON.stringify(user));await loadQueue();await refresh();watch()}
-export async function logout(force=false){if(queue.length&&!force)throw Error(`Есть неотправленные записи дневника (${queue.length}). Дождитесь сети или подтвердите выход с их удалением.`);if(user){try{await rpc('ritm_logout',{p_token:user.token})}catch{}await secureSet(queueKey(),null)}await secureSet(SESSION,null);user=null;data=empty();queue=[];location.reload()}
+export async function login(email){version=-1;sleepStamp=null;healthStamp=null;proposalStamp=null;user=await rpc('ritm_login',{p_email:email.trim().toLowerCase()});await secureSet(SESSION,JSON.stringify(user));await loadQueue();await loadOpen();await refresh();watch()}
+export async function logout(force=false){if(queue.length&&!force)throw Error(`Есть неотправленные записи дневника (${queue.length}). Дождитесь сети или подтвердите выход с их удалением.`);if(user){try{await rpc('ritm_logout',{p_token:user.token})}catch{}await secureSet(queueKey(),null);await secureSet(openKey(),null)}await secureSet(SESSION,null);user=null;data=empty();queue=[];location.reload()}

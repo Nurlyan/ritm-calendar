@@ -39,7 +39,9 @@ final class Notifier {
         {"activities", "Занятия", "Начало и окончание занятий", "4"},
         {"breaks", "Перерывы", "Перерыв и возвращение к работе", "3"},
         {"diaries", "Дневники", "Напоминания дополнить дневник и оценить эффект", "3"},
-        {"sleep", "Сон", "Утренняя отметка и подготовка ко сну", "3"},
+        {"sleep", "Сон", "Подготовка ко сну", "3"},
+        {"wake", "Подъём", "Закреплённое утреннее напоминание отметить подъём", "4"},
+        {"proposals", "Предложения", "Предложения активностей и ответы на них", "4"},
     };
     private Notifier() {}
 
@@ -108,7 +110,8 @@ final class Notifier {
     }
 
     static PendingIntent openApp(Context c, int code, JSONObject action) {
-        Intent i = new Intent(c, MainActivity.class).setAction(A_OPEN).setData(Uri.parse("ritm://open/" + code))
+        // No data URI here: Capacitor reloads the page for launch intents that carry one, which would drop the action.
+        Intent i = new Intent(c, MainActivity.class).setAction(A_OPEN)
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .putExtra("ritmAction", action.toString());
         return PendingIntent.getActivity(c, code, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -118,7 +121,7 @@ final class Notifier {
         if (!NotificationManagerCompat.from(c).areNotificationsEnabled()) return;
         ensureChannels(c);
         String key = r.optString("key");
-        int id = key.hashCode() | 0x10000;
+        int id = notificationId(key);
         boolean sensitive = r.optBoolean("sensitive"), lockDetails = prefs(c).getBoolean("lockDetails", false);
         JSONObject action = new JSONObject();
         try { action.put("route", r.optString("route", "today")).put("key", key); } catch (JSONException ignored) {}
@@ -127,13 +130,16 @@ final class Notifier {
             .setContentTitle(r.optString("title"))
             .setContentText(r.optString("text"))
             .setStyle(new NotificationCompat.BigTextStyle().bigText(r.optString("text")))
-            .setAutoCancel(true)
+            .setAutoCancel(!r.optBoolean("sticky"))
+            .setOngoing(r.optBoolean("sticky"))
+            .setPriority(r.optBoolean("sticky") ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(openApp(c, id, action))
             .setVisibility(sensitive || !lockDetails ? NotificationCompat.VISIBILITY_PRIVATE : NotificationCompat.VISIBILITY_PUBLIC)
             .setPublicVersion(new NotificationCompat.Builder(c, r.optString("channel", "activities"))
                 .setSmallIcon(R.drawable.ic_stat_ritm).setContentTitle("Ритм")
                 .setContentText(sensitive ? "Пора дополнить дневник" : "Напоминание о плане дня").build());
+        if (r.optBoolean("sticky")) b.addAction(0, "Отметить подъём", openApp(c, id ^ 0x2000, action));
         if (r.optBoolean("snooze", true)) {
             int minutes = prefs(c).getInt("snoozeMinutes", 10);
             Intent s = new Intent(c, ReminderReceiver.class).setAction(A_SNOOZE).setData(Uri.parse("ritm://snooze/" + Uri.encode(key)))
@@ -141,6 +147,21 @@ final class Notifier {
             b.addAction(0, "Отложить на " + minutes + " мин", PendingIntent.getBroadcast(c, id, s, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         }
         try { NotificationManagerCompat.from(c).notify(id, b.build()); } catch (SecurityException ignored) {}
+    }
+
+    static int notificationId(String key) { return key.hashCode() | 0x10000; }
+
+    static void dismiss(Context c, String prefix) {
+        NotificationManagerCompat nm = NotificationManagerCompat.from(c);
+        try {
+            JSONArray list = new JSONArray(prefs(c).getString("reminders", "[]"));
+            for (int i = 0; i < list.length(); i++) {
+                String key = list.getJSONObject(i).optString("key");
+                if (!key.startsWith(prefix)) continue;
+                nm.cancel(notificationId(key));
+                nm.cancel(notificationId(key + ":snooze"));
+            }
+        } catch (JSONException ignored) {}
     }
 
     /** Snoozing only re-posts the notification later. It never moves the activity, sleep or the call. */
@@ -207,8 +228,16 @@ final class Notifier {
                 if (b != current && b.optInt("start") > m && !b.optBoolean("actualEnd")) { next = b; break; }
             }
         }
+        String sleepOpen = card.isNull("sleepOpen") ? null : card.optString("sleepOpen", null);
+        boolean sleepState = (current == null && m >= 1380) || (current != null && "sleep".equals(current.optString("kind")));
         String title, text, status;
-        if (current != null) {
+        if (sleepState && sleepOpen != null && card.optBoolean("canEdit")) {
+            status = "";
+            String bed;
+            try { bed = clock(java.time.Instant.parse(sleepOpen).atZone(MSK).getHour() * 60 + java.time.Instant.parse(sleepOpen).atZone(MSK).getMinute()); } catch (Exception e) { bed = ""; }
+            title = "Сон с " + bed;
+            text = "Утром нажмите «Проснулся»";
+        } else if (current != null) {
             status = current.optBoolean("actualEnd") ? "завершено" : current.optBoolean("actualStart") ? "начато" : "по плану";
             title = current.optString("title");
             text = clock(current.optInt("start")) + "–" + clock(current.optInt("end")) + " · " + status
@@ -239,9 +268,11 @@ final class Notifier {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(card.optBoolean("lockDetails") ? NotificationCompat.VISIBILITY_PUBLIC : NotificationCompat.VISIBILITY_PRIVATE)
             .setPublicVersion(new NotificationCompat.Builder(c, "day").setSmallIcon(R.drawable.ic_stat_ritm).setContentTitle("Ритм").setContentText("План дня").build())
-            .setContentIntent(openApp(c, 2, action("open", dayKey, null)))
+            .setContentIntent(openApp(c, 2, sleepState && card.optBoolean("canEdit") ? route("sleep") : action("open", dayKey, null)))
             .setDeleteIntent(PendingIntent.getBroadcast(c, 2, new Intent(c, ReminderReceiver.class).setAction(A_CARD_DISMISSED).putExtra("day", dayKey), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
-        if (current != null && card.optBoolean("canEdit") && !current.optBoolean("locked")) {
+        if (card.optBoolean("canEdit") && sleepOpen != null) b.addAction(0, "Проснулся", openApp(c, 6, route("wake")));
+        else if (card.optBoolean("canEdit") && sleepState) b.addAction(0, "Лёг спать", openApp(c, 7, route("bed")));
+        else if (current != null && card.optBoolean("canEdit") && !current.optBoolean("locked")) {
             if (!current.optBoolean("actualStart")) b.addAction(0, "Начать", openApp(c, 3, action("start", dayKey, current.optString("id"))));
             else if (!current.optBoolean("actualEnd")) b.addAction(0, "Завершить", openApp(c, 4, action("finish", dayKey, current.optString("id"))));
         }
@@ -255,6 +286,12 @@ final class Notifier {
         }
         if (boundary == 2040) setAlarm(c, epoch(day.plusDays(1), 570), cardRefreshIntent(c));
         else setAlarm(c, epoch(day, boundary), cardRefreshIntent(c));
+    }
+
+    private static JSONObject route(String name) {
+        JSONObject a = new JSONObject();
+        try { a.put("route", name); } catch (JSONException ignored) {}
+        return a;
     }
 
     private static JSONObject action(String op, String day, String id) {

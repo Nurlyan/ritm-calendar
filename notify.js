@@ -13,7 +13,9 @@ const shift=(day,n)=>{const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDa
 function quiet(s,ms){const t=new Date(ms+3*3600000),m=t.getUTCHours()*60+t.getUTCMinutes();const [a,b]=[s.quietFrom,s.quietTo].map(v=>{const [h,x]=v.split(':').map(Number);return h*60+x});return a<=b?m>=a&&m<b:m>=a||m<b}
 
 /** Полный набор напоминаний на ближайшие дни. Чистая функция: тот же план даёт те же ключи, поэтому дублей нет. */
-export function buildReminders({dayPlan,today,now=Date.now(),role,health=[],s=settings(),days=7}){
+export function buildReminders({dayPlan,today,now=Date.now(),role,health=[],sleep=[],sleepOpen=null,s=settings(),days=7}){
+ // Дни, где подъём уже записан: утреннее напоминание не нужно.
+ const woke=new Set(sleep.map(x=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Moscow'}).format(new Date(x.wake))));
  if(!s.enabled)return [];
  const out=[],push=r=>{if(r.at>now&&!quiet(s,r.at))out.push(r)},owner=role==='owner';
  for(let i=-1;i<days;i++){const day=shift(today,i);
@@ -27,8 +29,10 @@ export function buildReminders({dayPlan,today,now=Date.now(),role,health=[],s=se
      push({key:`back:${day}:${b.id}:${t}`,at:at(day,t+s.breakMinutes),channel:'breaks',title:'Можно вернуться к работе',text:`${b.title} до ${clock(b.end)}`,route:'today'});
     }
   }
-  if(owner&&s.types.morning)push({key:`morning:${day}`,at:at(day,minutes(s.morning)%1440),channel:'sleep',title:'Доброе утро',text:'Отметьте сон и утреннее самочувствие',route:'wake',sensitive:true});
-  if(owner&&s.types.bedtime)push({key:`bed:${day}`,at:at(day,minutes(s.bedtime)),channel:'sleep',title:'Пора готовиться ко сну',text:'Отход ко сну 00:30–00:45',route:'today'});
+  // Утром — закреплённое напоминание «Я проснулся»; висит, пока подъём не отмечен.
+  if(owner&&s.types.morning&&!woke.has(day))push({key:`morning:${day}`,at:at(day,minutes(s.morning)%1440),channel:'wake',title:'Доброе утро',text:sleepOpen?`Вы легли в ${new Date(sleepOpen.bed).toLocaleTimeString('ru-RU',{timeZone:'Europe/Moscow',hour:'2-digit',minute:'2-digit'})}. Нажмите, чтобы отметить подъём`:'Нажмите, чтобы отметить сон и самочувствие',route:'wake',sensitive:true,sticky:true});
+  // Вечером — нажатие открывает сразу «Лёг спать».
+  if(owner&&s.types.bedtime&&!(sleepOpen&&i===0))push({key:`bed:${day}`,at:at(day,minutes(s.bedtime)),channel:'sleep',title:'Пора готовиться ко сну',text:'Нажмите, когда ляжете: «Лёг спать»',route:'bed'});
  }
  if(owner&&s.types.effect)for(const r of health.filter(r=>r.kind==='migraine'))(r.payload.treatments||[]).forEach((t,i)=>{if(t.remindAt&&t.effect==='unknown')push({key:`effect:${r.id}:${i}:${t.remindAt}`,at:new Date(t.remindAt).getTime(),channel:'diaries',title:'Пора дополнить дневник',text:'Оцените, как подействовало средство',route:`migraine:${r.id}`,sensitive:true,snooze:true})});
  return out.sort((a,b)=>a.at-b.at).slice(0,300);
@@ -38,12 +42,12 @@ function cardDays(dayPlan,today){const days={};for(const d of [shift(today,-1),t
 
 let last='';
 /** Передаёт план в Android. Вызывается после загрузки и любых изменений; одинаковые данные повторно не отправляются. */
-export async function sync({dayPlan,today,role,health,loggedIn},restore=false){
+export async function sync({dayPlan,today,role,health,sleep=[],sleepOpen=null,loggedIn},restore=false){
  if(!native.isNative)return;
  if(restore)last='';
  const s=settings();
- const reminders=loggedIn?buildReminders({dayPlan,today,role,health,s}):[];
- const card={enabled:loggedIn&&s.enabled&&s.card,lockDetails:s.lockDetails,canEdit:role==='owner',days:loggedIn?cardDays(dayPlan,today):{}};
+ const reminders=loggedIn?buildReminders({dayPlan,today,role,health,sleep,sleepOpen,s}):[];
+ const card={enabled:loggedIn&&s.enabled&&s.card,lockDetails:s.lockDetails,canEdit:role==='owner',sleepOpen:role==='owner'&&sleepOpen?sleepOpen.bed:null,days:loggedIn?cardDays(dayPlan,today):{}};
  const body=JSON.stringify([reminders,card,s.snoozeMinutes,s.lockDetails]);
  if(body===last)return;last=body;
  try{await native.schedule(reminders,{snoozeMinutes:s.snoozeMinutes,lockDetails:s.lockDetails});await native.card(card,restore)}catch(e){last=''}
@@ -61,15 +65,15 @@ export async function settingsView(role){
  <div class="form-row"><label>Отложить на, мин<input type="number" min="5" max="120" data-num="snoozeMinutes" value="${s.snoozeMinutes}"></label><label>Тихие часы<span class="pair"><input type="time" data-time="quietFrom" value="${s.quietFrom}"><input type="time" data-time="quietTo" value="${s.quietTo}"></span></label></div></section>
  <section class="glass section settings-list"><h2>Занятия</h2>${sw('types.start','Начало занятия',s.types.start)}<label>Предупреждать за<select data-num="lead">${[0,5,10,15].map(n=>`<option value="${n}" ${s.lead===n?'selected':''}>${n?n+' мин':'в момент начала'}</option>`).join('')}${[0,5,10,15].includes(s.lead)?'':`<option value="${s.lead}" selected>${s.lead} мин</option>`}</select></label><label>Своё значение, мин<input type="number" min="0" max="120" data-num="lead" value="${s.lead}"></label>${sw('types.ending','Скоро закончить блок',s.types.ending)}<label>За сколько минут до конца<input type="number" min="1" max="60" data-num="endingLead" value="${s.endingLead}"></label><p class="subtle">Категории занятий</p><div class="chips">${Object.entries(kindNames).map(([k,v])=>`<label class="chip-check"><input type="checkbox" data-set="kinds.${k}" ${s.kinds[k]?'checked':''}>${v}</label>`).join('')}</div></section>
  ${owner?`<section class="glass section settings-list"><h2>Перерывы</h2>${sw('types.breaks','Перерывы в рабочих блоках',s.types.breaks,'По умолчанию выключены. Только уведомления — расписание не меняется.')}<div class="form-row"><label>Работать, мин<input type="number" min="15" max="180" data-num="workMinutes" value="${s.workMinutes}"></label><label>Перерыв, мин<input type="number" min="5" max="60" data-num="breakMinutes" value="${s.breakMinutes}"></label></div></section>
- <section class="glass section settings-list"><h2>Сон и дневники</h2>${sw('types.morning','Утром отметить сон и самочувствие',s.types.morning)}<label>Время утреннего напоминания<input type="time" data-time="morning" value="${s.morning}"></label>${sw('types.bedtime','Подготовка ко сну',s.types.bedtime)}<label>Время напоминания<input type="time" data-time="bedtime" value="${s.bedtime}"></label>${sw('types.effect','Оценить эффект средства',s.types.effect,'Только если вы сами указали время напоминания в записи приступа.')}</section>`:''}
+ <section class="glass section settings-list"><h2>Сон и дневники</h2>${sw('types.morning','Утром отметить подъём',s.types.morning,'Закреплённое уведомление; исчезает, когда подъём отмечен.')}<label>Время утреннего напоминания<input type="time" data-time="morning" value="${s.morning}"></label>${sw('types.bedtime','Подготовка ко сну',s.types.bedtime)}<label>Время напоминания<input type="time" data-time="bedtime" value="${s.bedtime}"></label>${sw('types.effect','Оценить эффект средства',s.types.effect,'Только если вы сами указали время напоминания в записи приступа.')}</section>`:''}
  <section class="glass section settings-list"><h2>Состояние Android</h2>
  <div class="status-row"><span>Уведомления</span><strong>${st.notifications?'разрешены':'выключены'}</strong></div>
  <div class="status-row"><span>Точное время</span><strong>${st.exactAlarms?'доступно':'примерное (до ~10 мин)'}</strong></div>
  <div class="status-row"><span>«Не беспокоить»</span><strong>${st.dnd?'включено — Android может скрыть звук':'выключено'}</strong></div>
- <div class="status-row"><span>Запланировано напоминаний</span><strong>${st.scheduled??0}</strong></div>
- <p class="subtle">Звук, вибрация и важность каждого типа настраиваются в каналах Android: «Текущий день», «Занятия», «Перерывы», «Дневники», «Сон».</p>
+ <div class="status-row"><span>Запланировано напоминаний</span><strong>${st.scheduled??0}</strong></div><div class="status-row"><span>Проверка предложений</span><strong>${st.inboxStatus?esc(st.inboxStatus)+(st.inboxAt?" · "+new Date(st.inboxAt).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}):""):"ещё не запускалась"}</strong></div>
+ <p class="subtle">Звук, вибрация и важность каждого типа настраиваются в каналах Android: «Текущий день», «Занятия», «Перерывы», «Дневники», «Сон», «Подъём», «Предложения».</p>
  <div class="export-buttons"><button id="test-notify">Тестовое уведомление</button><button data-open-settings="notifications">Каналы и звук</button>${st.exactAlarms?'':'<button data-open-settings="exactAlarms">Разрешить точное время</button>'}</div>
- <p class="subtle">Изменения с другого устройства попадают в напоминания после открытия приложения и синхронизации — мгновенной фоновой доставки нет. После принудительной остановки приложения Android не показывает его напоминания до следующего запуска.</p></section>`;
+ <p class="subtle">Изменения с другого устройства попадают в напоминания после открытия приложения и синхронизации — мгновенной фоновой доставки нет. Новые предложения и ответы на них проверяются в фоне примерно раз в 15 минут, когда есть сеть; в режиме экономии Android может проверять реже. После принудительной остановки приложения Android не показывает его напоминания до следующего запуска.</p></section>`;
 }
 export function bindSettings({render,notify,refresh}){
  const update=fn=>{const s=settings();fn(s);saveSettings(s);resync();native.haptic();refresh();render()};

@@ -39,6 +39,8 @@ import java.nio.charset.StandardCharsets;
 })
 public class RitmPlugin extends Plugin {
     private String pendingFile;
+    // The latest notification/card action, kept until the page takes it: on a cold start the page may load twice.
+    private JSObject pendingAction;
 
     @Override
     public void load() {
@@ -54,13 +56,22 @@ public class RitmPlugin extends Plugin {
         deliver(intent);
     }
 
-    /** Notification taps and card buttons arrive here; the event is retained until the web layer listens. */
+    /** Notification taps and card buttons arrive here. A running page gets an event; a starting page calls takeAction(). */
     private void deliver(Intent intent) {
         if (intent == null || intent.getStringExtra("ritmAction") == null) return;
         try {
-            notifyListeners("action", JSObject.fromJSONObject(new JSONObject(intent.getStringExtra("ritmAction"))), true);
+            pendingAction = JSObject.fromJSONObject(new JSONObject(intent.getStringExtra("ritmAction")));
+            notifyListeners("action", pendingAction, false);
         } catch (Exception ignored) {}
         intent.removeExtra("ritmAction");
+    }
+
+    @PluginMethod
+    public void takeAction(PluginCall call) {
+        JSObject r = new JSObject();
+        if (pendingAction != null) r.put("action", pendingAction);
+        pendingAction = null;
+        call.resolve(r);
     }
 
     // ---- Secure storage ----
@@ -102,6 +113,8 @@ public class RitmPlugin extends Plugin {
         r.put("cardVisible", false);
         for (android.service.notification.StatusBarNotification n : nm.getActiveNotifications()) if (n.getId() == Notifier.CARD_ID) r.put("cardVisible", true);
         try { r.put("scheduled", new JSONArray(Notifier.prefs(c).getString("reminders", "[]")).length()); } catch (org.json.JSONException e) { r.put("scheduled", 0); }
+        r.put("inboxStatus", Notifier.prefs(c).getString("inboxStatus", null));
+        r.put("inboxAt", Notifier.prefs(c).getLong("inboxAt", 0));
         call.resolve(r);
     }
 
@@ -181,6 +194,39 @@ public class RitmPlugin extends Plugin {
             Notifier.show(getContext(), r);
             call.resolve();
         } catch (Exception e) { call.reject("Не удалось показать уведомление"); }
+    }
+
+    @PluginMethod
+    public void dismiss(PluginCall call) {
+        Notifier.dismiss(getContext(), call.getString("prefix", "\u0000"));
+        call.resolve();
+    }
+
+    // ---- Background check for proposals ----
+
+    @PluginMethod
+    public void inboxStart(PluginCall call) {
+        android.content.SharedPreferences p = Notifier.prefs(getContext());
+        android.content.SharedPreferences.Editor e = p.edit().putString("inboxUrl", call.getString("url")).putString("inboxKey", call.getString("key"));
+        if (!p.contains("inboxSince")) e.putString("inboxSince", call.getString("since"));
+        e.apply();
+        InboxWorker.start(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void inboxStop(PluginCall call) {
+        InboxWorker.stop(getContext());
+        call.resolve();
+    }
+
+    /** Events the user already saw in the open app are not announced again by the background check. */
+    @PluginMethod
+    public void inboxSeen(PluginCall call) {
+        android.content.SharedPreferences p = Notifier.prefs(getContext());
+        String since = call.getString("since", "");
+        if (since.compareTo(p.getString("inboxSince", "")) > 0) p.edit().putString("inboxSince", since).apply();
+        call.resolve();
     }
 
     // ---- Files ----

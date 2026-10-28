@@ -54,3 +54,19 @@ test('напоминание об эффекте только по явно за
  assert.equal(list.length,1);
  assert.equal(list[0].title,'Пора дополнить дневник');
 });
+
+test('утреннее напоминание закреплено, ведёт к отметке подъёма и пропадает, если подъём записан',()=>{
+ const morning=run().find(r=>r.key==='morning:2026-10-27');
+ assert.equal(morning.sticky,true);assert.equal(morning.route,'wake');assert.equal(morning.channel,'wake');
+ const woke=run({sleep:[{bed:'2026-10-26T21:40:00Z',wake:'2026-10-27T05:50:00Z'}]});
+ assert.ok(!woke.some(r=>r.key==='morning:2026-10-27'));
+ assert.ok(woke.some(r=>r.key==='morning:2026-10-28'));
+});
+
+test('вечернее напоминание открывает «Лёг спать» и не приходит, если отход уже отмечен',()=>{
+ const bed=run().find(r=>r.key==='bed:2026-10-27');
+ assert.equal(bed.route,'bed');
+ const open=run({sleepOpen:{id:'x',bed:'2026-10-27T21:00:00Z'}});
+ assert.ok(!open.some(r=>r.key==='bed:2026-10-27'));
+ assert.match(open.find(r=>r.key==='morning:2026-10-28').text,/Вы легли в 00:00/);
+});
