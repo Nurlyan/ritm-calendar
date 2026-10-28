@@ -1,0 +1,11 @@
+{
+  "appId": "io.github.nurlyan.ritm",
+  "appName": "Ритм",
+  "webDir": "www",
+  "loggingBehavior": "none",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

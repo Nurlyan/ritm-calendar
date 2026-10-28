@@ -1,1 +1,20 @@
-{"name":"ritm-calendar","version":"1.1.0","private":true,"type":"module","scripts":{"test":"node --test tests.mjs health-tests.mjs","start":"python -m http.server 4173 --bind 127.0.0.1"}}
+{
+  "name": "ritm-calendar",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests.mjs health-tests.mjs notify-tests.mjs",
+    "start": "python -m http.server 4173 --bind 127.0.0.1",
+    "build:web": "node scripts/build-web.mjs",
+    "sync": "node scripts/build-web.mjs && cap sync android",
+    "apk:debug": "node scripts/build-web.mjs && cap sync android && cd android && gradlew.bat assembleDebug"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0"
+  }
+}
