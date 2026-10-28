@@ -16,5 +16,21 @@ export function base(day){const rows=[];const a=(title,start,end,kind)=>rows.pus
 export function validate(blocks,day){if(!Array.isArray(blocks)||blocks.length>40)throw Error('Некорректный план');let end=570;const ids=new Set();for(const b of [...blocks].sort((a,b)=>a.start-b.start)){if(ids.has(b.id)||!Number.isInteger(b.start)||!Number.isInteger(b.end)||b.start<end||b.end<=b.start||b.end>1470||!b.title?.trim()||b.title.length>100||!['work','meal','sport','personal','together','sleep','call'].includes(b.kind))throw Error('Занятия пересекаются или выходят за границы 09:30–00:30');ids.add(b.id);end=b.end}const call=blocks.filter(b=>b.kind==='call');if(day===1&&(call.length!==1||call[0].start!==1200||call[0].end!==1280||!call[0].locked))throw Error('Созвон закреплён на вторник 20:00–21:20');if(day!==1&&call.length)throw Error('Созвон доступен только во вторник')}
 // Earlier events stay in place. Later events use remaining gaps; the call is immutable.
 // Overflow is explicitly deferred rather than silently dropped or pushed into sleep.
-export function reflow(blocks,id,start,duration,patch={}){const list=structuredClone(blocks).sort((a,b)=>a.start-b.start);const index=list.findIndex(b=>b.id===id);if(index<0||list[index].locked)throw Error('Это событие закреплено');if(!Number.isInteger(start)||!Number.isInteger(duration)||start<570||start+duration>1470||duration<5)throw Error('Выберите время в пределах 09:30–00:30');const fixed=list.filter(b=>b.locked);const before=list.slice(0,index).filter(b=>!b.locked);if(before.some(b=>b.end>start))throw Error('Начало пересекается с предыдущим занятием');if(fixed.some(b=>start<b.end&&start+duration>b.start))throw Error('Это время занято созвоном с Максимом');const chosen={...list[index],...patch,start,end:start+duration};let cursor=chosen.end;const after=[];const deferred=[];for(const b of list.slice(index+1).filter(b=>!b.locked)){let s=Math.max(b.start,cursor);const len=b.end-b.start;for(const f of fixed)if(s<f.end&&s+len>f.start)s=f.end;if(s+len>1470){deferred.push(b);continue}after.push({...b,start:s,end:s+len});cursor=s+len}return {blocks:[...before,chosen,...after,...fixed].sort((a,b)=>a.start-b.start),deferred}}
+export function reflow(blocks,id,start,duration,patch={}){
+ const list=structuredClone(blocks).sort((a,b)=>a.start-b.start);
+ const chosen=list.find(b=>b.id===id);
+ if(!chosen||chosen.locked)throw Error('Это событие закреплено');
+ if(!Number.isInteger(start)||!Number.isInteger(duration)||start<570||start+duration>1470||duration<5)throw Error('Выберите время в пределах 09:30–00:30');
+ const fixed=list.filter(b=>b.locked);
+ if(fixed.some(b=>start<b.end&&start+duration>b.start))throw Error('Это время занято созвоном с Максимом');
+ const other=list.filter(b=>b.id!==id&&!b.locked);
+ const before=other.filter(b=>b.end<=start);
+ const remaining=other.filter(b=>b.end>start);
+ Object.assign(chosen,patch,{start,end:start+duration});
+ let cursor=chosen.end;const after=[],deferred=[];
+ for(const b of remaining){let s=Math.max(b.start,cursor);const len=b.end-b.start;for(const f of fixed)if(s<f.end&&s+len>f.start)s=f.end;
+ if(s+len>1470){deferred.push(b);continue}
+ after.push({...b,start:s,end:s+len});cursor=s+len}
+ return {blocks:[...before,chosen,...after,...fixed].sort((a,b)=>a.start-b.start),deferred};
+}
 export function swapDays(wed,thu){return [structuredClone(thu).map(b=>({...b,id:crypto.randomUUID()})),structuredClone(wed).map(b=>({...b,id:crypto.randomUUID()}))]}
