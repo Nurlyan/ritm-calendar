@@ -290,6 +290,39 @@ public class RitmPlugin extends Plugin {
         } catch (Exception e) { call.reject("Не удалось открыть меню «Поделиться»"); }
     }
 
+    /**
+     * Android 14 and older draw the status and navigation bars as separate strips around the page: paint them in the
+     * page background so they do not stay grey or white in the dark theme. Android 15+ draws the page under the bars.
+     */
+    @PluginMethod
+    public void barColors(PluginCall call) {
+        String color = call.getString("color", "#0d1512");
+        boolean dark = Boolean.TRUE.equals(call.getBoolean("dark", true));
+        getActivity().runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT < 35) {
+                android.view.Window w = getActivity().getWindow();
+                int c;
+                try { c = android.graphics.Color.parseColor(color); } catch (IllegalArgumentException e) { call.reject("color"); return; }
+                w.setStatusBarColor(c);
+                w.setNavigationBarColor(c);
+                androidx.core.view.WindowInsetsControllerCompat ic = androidx.core.view.WindowCompat.getInsetsController(w, w.getDecorView());
+                ic.setAppearanceLightStatusBars(!dark);
+                ic.setAppearanceLightNavigationBars(!dark);
+            }
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void insets(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            float[] o = getActivity() instanceof MainActivity ? ((MainActivity) getActivity()).overlap() : new float[]{0, 0, 0, 0};
+            JSObject r = new JSObject();
+            r.put("top", o[0]); r.put("bottom", o[1]); r.put("left", o[2]); r.put("right", o[3]);
+            call.resolve(r);
+        });
+    }
+
     @PluginMethod
     public void haptic(PluginCall call) {
         String kind = call.getString("kind", "tick");

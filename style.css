@@ -11,7 +11,8 @@
  --shadow:0 1px 2px rgba(23,45,34,.05),0 10px 30px rgba(23,45,34,.08);--shadow-lg:0 30px 80px rgba(16,36,27,.22);--highlight:inset 0 1px 0 rgba(255,255,255,.85);
  --accent:#2a6b53;--accent-2:#3f8a6c;--on-accent:#fff;--accent-soft:#d9eadf;--focus:#3f8a6c;
  --warn-bg:#fbf1d8;--warn-edge:#ecd9a4;--warn-ink:#5f4708;--danger:#a3402f;
- --safe-top:max(env(safe-area-inset-top,0px),var(--safe-area-inset-top,0px));--safe-bottom:max(env(safe-area-inset-bottom,0px),var(--safe-area-inset-bottom,0px));
+ /* В приложении — точные значения от Android (--app-*), в браузере — env() */
+ --safe-top:var(--app-top,max(env(safe-area-inset-top,0px),var(--safe-area-inset-top,0px)));--safe-bottom:var(--app-bottom,max(env(safe-area-inset-bottom,0px),var(--safe-area-inset-bottom,0px)));--safe-left:var(--app-left,env(safe-area-inset-left,0px));--safe-right:var(--app-right,env(safe-area-inset-right,0px));
  --radius:24px;--radius-s:16px;--tabbar:68px;
  --ease:cubic-bezier(.2,.8,.2,1);
  font-family:Manrope,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--ink);background:var(--bg);
@@ -544,3 +545,10 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);outline:2px s
 .login-card form{display:grid;gap:12px}.login-card input{font-size:1.1rem;min-height:54px}.login-card .subtle{margin-top:12px}
 .sidebar:has(.tabbar:empty){display:none}
 #notify-ask .q-ico{background:var(--accent-soft);color:var(--accent)}
+/* 1.9 · разные устройства: боковые отступы под вырез и навигацию в горизонтальном положении; узкие экраны */
+body{padding-left:var(--safe-left);padding-right:var(--safe-right)}
+.sidebar{padding-left:calc(8px + var(--safe-left));padding-right:calc(8px + var(--safe-right))}
+dialog{padding-left:calc(20px + var(--safe-left));padding-right:calc(20px + var(--safe-right))}
+@media(max-width:350px){.page{padding-left:12px;padding-right:12px}dialog{padding-left:14px;padding-right:14px}.navitem span{font-size:.7rem}.dnd-dur button{width:28px}}
+@media(orientation:landscape) and (max-height:500px){dialog{max-height:92dvh}.hero h2{font-size:1.5rem}}
+@media(max-width:380px){.hero-top{gap:6px}.hero-top .chip{padding:5px 10px;font-size:.8rem}.hero-top .chip .ico{width:15px;height:15px}}

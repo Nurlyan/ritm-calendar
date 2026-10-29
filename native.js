@@ -14,6 +14,8 @@ export const card=(data,restore=false)=>call('card',{card:data,restore});
 export const test=channel=>call('test',{channel});
 export const haptic=(kind='tick')=>{if(isNative)call('haptic',{kind}).catch(()=>{})};
 // Убирает закреплённое утреннее напоминание, когда подъём отмечен.
+// Реальное перекрытие страницы системными полосами (CSS px): на разных устройствах и версиях Android оно разное.
+export async function applyInsets(){if(!isNative)return;try{const o=await call('insets');const s=document.documentElement.style;for(const k of ['top','bottom','left','right'])s.setProperty('--app-'+k,(o?.[k]||0)+'px')}catch{}}
 export const dismissKey=key=>{if(isNative)call('dismiss',{key}).catch(()=>{})};
 export const dismissMorning=()=>{if(isNative)call('dismiss',{prefix:'morning:'}).catch(()=>{})};
 // Фоновая проверка предложений (Android WorkManager, примерно раз в 15 минут при наличии сети).
@@ -24,6 +26,9 @@ let seenSent='';
 export function inboxSeen(since){if(isNative&&since&&since!==seenSent){seenSent=since;call('inboxSeen',{since}).catch(()=>{})}}
 // Значки строки состояния и жестов следуют выбранной в приложении теме, а не только системной.
 export function barsStyle(theme){if(isNative)cap.nativePromise('SystemBars','setStyle',{style:theme==='dark'?'DARK':theme==='light'?'LIGHT':'DEFAULT'}).catch(()=>{})}
+// Цвет системных полос = фон приложения (на Android 14 и старше полосы рисуются отдельно от страницы).
+export function barColors(){if(!isNative)return;requestAnimationFrame(()=>{const m=getComputedStyle(document.body).backgroundColor.match(/\d+(\.\d+)?/g)||[13,21,18],[r,g,b]=m.map(Number),hex='#'+[r,g,b].map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');call('barColors',{color:hex,dark:(0.299*r+0.587*g+0.114*b)<140}).catch(()=>{})})}
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>barColors());
 export const takeAction=async()=>isNative?(await call('takeAction').catch(()=>null))?.action||null:null;
 export function onAction(handler){if(isNative)cap.nativeCallback('RitmNative','addListener',{eventName:'action'},handler)}
 
