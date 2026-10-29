@@ -34,3 +34,15 @@ export function reflow(blocks,id,start,duration,patch={}){
  return {blocks:[...before,chosen,...after,...fixed].sort((a,b)=>a.start-b.start),deferred};
 }
 export function swapDays(wed,thu){return [structuredClone(thu).map(b=>({...b,id:crypto.randomUUID()})),structuredClone(wed).map(b=>({...b,id:crypto.randomUUID()}))]}
+// Day editor: movable blocks follow each other in the chosen order starting at `from`.
+// The call, the bedtime block and anything in `pinned` keep their time; what no longer fits before bedtime is deferred.
+export function pack(blocks,order,{from=570,pinned=[]}={}){
+ const fixed=blocks.filter(b=>b.locked||b.kind==='sleep'||pinned.includes(b.id));
+ const limit=Math.min(1470,...fixed.filter(b=>b.kind==='sleep').map(b=>b.start));
+ let cursor=from;const placed=[],deferred=[];
+ for(const b of order){if(fixed.some(f=>f.id===b.id))continue;const len=b.end-b.start;let s=cursor;
+  for(let moved=true;moved;){moved=false;for(const f of fixed)if(s<f.end&&s+len>f.start){s=f.end;moved=true}}
+  if(s+len>limit){deferred.push(b);continue}
+  placed.push({...b,start:s,end:s+len});cursor=s+len}
+ return {blocks:[...placed,...fixed].sort((a,b)=>a.start-b.start),deferred};
+}

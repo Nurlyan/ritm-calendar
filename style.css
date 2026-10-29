@@ -450,3 +450,44 @@ dialog.closing::backdrop{animation:fade-out .22s ease both}
 @media(prefers-color-scheme:light){:root:not([data-theme=dark]) dialog{background:linear-gradient(170deg,#fbfdfb,#f1f6f2)}}
 :root[data-theme=light] dialog{background:linear-gradient(170deg,#fbfdfb,#f1f6f2)}
 :root[data-theme=dark] dialog{background:linear-gradient(170deg,#1b2823,#111a16)}
+/* 1.4 · утро одной формой */
+.m-sec{padding:14px 0 6px;border-top:1px solid var(--hairline)}
+.m-sec h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:1.05rem}
+.m-sec h3 .ico{width:20px;height:20px;color:var(--accent)}
+.sleep-len{margin:-2px 0 10px;font-size:.88rem;font-weight:650;color:var(--ink-2)}
+.score-row{border:0;padding:0;margin:0 0 14px;min-width:0}
+.score-row legend{display:flex;justify-content:space-between;align-items:baseline;gap:8px;width:100%;padding:0;margin-bottom:8px;font-size:.9rem;font-weight:650;color:var(--ink-2)}
+.score-row legend small{font-weight:500;color:var(--muted);font-size:.78rem;text-align:right}
+.score-line{display:flex;gap:4px}
+.score-chip{position:relative;flex:1 1 0;min-width:0;display:block}
+.score-chip input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;min-height:0;cursor:pointer}
+.score-chip span{display:flex;align-items:center;justify-content:center;height:40px;border-radius:12px;font-weight:700;font-size:.92rem;background:var(--field);border:1px solid var(--field-edge);transition:transform .18s var(--ease),background .18s,color .18s}
+.score-chip input:checked+span{background:var(--sc);color:#fff;border-color:transparent;transform:scale(1.08);box-shadow:0 4px 12px color-mix(in srgb,var(--sc) 40%,transparent)}
+.score-chip input:focus-visible+span{outline:3px solid var(--focus);outline-offset:2px}
+/* 1.4 · редактор дня */
+.agenda-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.agenda-head .text-button,.card-actions .text-button{display:inline-flex;align-items:center;gap:6px}
+.agenda-head .text-button .ico{width:16px;height:16px}
+.card-actions{display:flex;gap:2px;align-items:center}
+.dnd{list-style:none;margin:12px 0 8px;padding:0;display:flex;flex-direction:column;gap:8px;position:relative}
+.dnd-item{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 4px;border-radius:18px;background:var(--field);border:1px solid var(--field-edge);border-left:4px solid var(--k,var(--accent));transition:transform .22s cubic-bezier(.16,1,.3,1),box-shadow .2s,opacity .2s}
+.dnd.dragging .dnd-item:not(.dragging){transition:transform .22s cubic-bezier(.16,1,.3,1)}
+.dnd-item.dragging{transition:box-shadow .2s;z-index:2;box-shadow:0 14px 34px rgba(0,0,0,.22);background:var(--glass-strong);scale:1.02}
+.dnd-item.dropped{animation:dnd-drop .3s cubic-bezier(.16,1,.3,1)}
+@keyframes dnd-drop{from{scale:1.02}to{scale:1}}
+.dnd-item.over{opacity:.55}
+.dnd-item .grip{flex-shrink:0;width:32px;min-height:44px;padding:0;border:0;background:none;box-shadow:none;color:var(--muted);touch-action:none;cursor:grab;display:flex;align-items:center;justify-content:center}
+.dnd-item .grip:active{cursor:grabbing;color:var(--ink)}
+.dnd-time{flex-shrink:0;width:48px;display:flex;flex-direction:column;font-weight:750;font-variant-numeric:tabular-nums;font-size:.92rem}
+.dnd-time small{color:var(--muted);font-weight:550;font-size:.78rem}
+.dnd-body{flex:1;min-width:0;display:flex;flex-direction:column}
+.dnd-body strong{font-size:.93rem;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.dnd-body small{color:var(--muted);font-size:.8rem}
+.dnd-dur{display:flex;gap:3px;flex-shrink:0}
+.dnd-dur button,.dnd-later{width:32px;min-width:0;min-height:36px;padding:0;border-radius:11px;font-size:1.1rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.dnd-later{width:26px;background:none;border:0;box-shadow:none;color:var(--muted)}
+.dnd-fixed{display:flex;gap:8px;align-items:flex-start;font-size:.86rem}
+.dnd-fixed .ico{width:16px;height:16px;flex-shrink:0;margin-top:2px}
+.dnd-out{display:flex;flex-wrap:wrap;gap:6px}
+@media (prefers-reduced-motion:reduce){.dnd-item,.score-chip span{transition:none}.dnd-item.dropped{animation:none}}
+.dnd-out .chip-btn{margin:0;min-height:36px;flex-direction:row}
