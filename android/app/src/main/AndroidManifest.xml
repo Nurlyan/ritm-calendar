@@ -51,6 +51,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Calendar reminders at the exact block time. USE_EXACT_ALARM is granted to calendar/alarm apps on Android 13+. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />

@@ -113,6 +113,8 @@ public class RitmPlugin extends Plugin {
         r.put("cardVisible", false);
         for (android.service.notification.StatusBarNotification n : nm.getActiveNotifications()) if (n.getId() == Notifier.CARD_ID) r.put("cardVisible", true);
         try { r.put("scheduled", new JSONArray(Notifier.prefs(c).getString("reminders", "[]")).length()); } catch (org.json.JSONException e) { r.put("scheduled", 0); }
+        r.put("sdk", Build.VERSION.SDK_INT);
+        r.put("promoted", NotificationManagerCompat.from(c).canPostPromotedNotifications());
         r.put("inboxStatus", Notifier.prefs(c).getString("inboxStatus", null));
         r.put("inboxAt", Notifier.prefs(c).getLong("inboxAt", 0));
         call.resolve(r);
@@ -147,6 +149,10 @@ public class RitmPlugin extends Plugin {
             case "exactAlarms":
                 i = Build.VERSION.SDK_INT >= 31 ? new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + c.getPackageName()))
                     : new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName()));
+                break;
+            case "promotion":
+                // Android 16+: переключатель Live Updates для приложения.
+                i = new Intent(Build.VERSION.SDK_INT >= 36 ? "android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS" : Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, c.getPackageName());
                 break;
             case "battery":
                 i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);

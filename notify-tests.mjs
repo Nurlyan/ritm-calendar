@@ -83,3 +83,12 @@ test('«Отметьте» через 5 минут после конца бло�
  assert.ok(!after.some(x=>x.key.endsWith(bl[0].id)||x.key.endsWith(bl[1].id)));
  assert.equal(buildReminders({dayPlan,today,now,role:'viewer',s,days:1}).filter(x=>x.key.startsWith('mark:')).length,0);
 });
+
+test('за 5 и за 1 минуту до конца — одно уведомление, второе заменяет первое',()=>{
+ const bl=base(weekday(today)),work=bl.find(b=>b.kind==='work');
+ const r=run().filter(x=>x.key.startsWith('soon')&&x.key.endsWith(`${today}:${work.id}`));
+ assert.deepEqual(r.map(x=>x.at),[5,1].map(l=>new Date(`${today}T00:00:00+03:00`).getTime()+(work.end-l)*60000));
+ assert.ok(r.every(x=>x.notifyKey===`soon:${today}:${work.id}`&&x.buttons[0].action.op==='done'));
+ assert.ok(!run().some(x=>x.key.startsWith('soon')&&x.key.includes(bl.find(b=>b.kind==='sleep').id)));
+ plan[today]=bl.map(b=>b.id===work.id?{...b,actualEnd:'x'}:b);const after=run().filter(x=>x.key.startsWith('soon')&&x.key.endsWith(work.id));delete plan[today];assert.equal(after.length,0);
+});

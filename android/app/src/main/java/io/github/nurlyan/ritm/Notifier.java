@@ -30,7 +30,8 @@ import java.util.Set;
 final class Notifier {
     static final ZoneId MSK = ZoneId.of("Europe/Moscow");
     static final String PREFS = "ritm_native";
-    static final int CARD_ID = 1;
+    static final int CARD_ID = 1, DAY_ID = 8;
+    private static final int GAP = 0xFF9AA3A0, WARN = 0xFFE0A030;
     static final String A_REMIND = "io.github.nurlyan.ritm.REMIND", A_SNOOZE = "io.github.nurlyan.ritm.SNOOZE",
         A_CARD = "io.github.nurlyan.ritm.CARD", A_CARD_DISMISSED = "io.github.nurlyan.ritm.CARD_DISMISSED",
         A_OPEN = "io.github.nurlyan.ritm.OPEN";
@@ -121,7 +122,8 @@ final class Notifier {
         if (!NotificationManagerCompat.from(c).areNotificationsEnabled()) return;
         ensureChannels(c);
         String key = r.optString("key");
-        int id = notificationId(key);
+        // Reminders sharing notifyKey replace each other (за 5 минут → за 1 минуту).
+        int id = notificationId(r.optString("notifyKey", key));
         boolean sensitive = r.optBoolean("sensitive"), lockDetails = prefs(c).getBoolean("lockDetails", false);
         JSONObject action = new JSONObject();
         try { action.put("route", r.optString("route", "today")).put("key", key); } catch (JSONException ignored) {}
@@ -199,9 +201,87 @@ final class Notifier {
         return PendingIntent.getBroadcast(c, 1, new Intent(c, ReminderReceiver.class).setAction(A_CARD), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    /** Minute tick for the progress bars; a non-wakeup alarm, so it never wakes a sleeping phone. */
+    private static PendingIntent cardTickIntent(Context c) {
+        return PendingIntent.getBroadcast(c, 3, new Intent(c, ReminderReceiver.class).setAction(A_CARD).setData(Uri.parse("ritm://card/tick")), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
     static void hideCard(Context c) {
         NotificationManagerCompat.from(c).cancel(CARD_ID);
+        NotificationManagerCompat.from(c).cancel(DAY_ID);
         c.getSystemService(AlarmManager.class).cancel(cardRefreshIntent(c));
+        c.getSystemService(AlarmManager.class).cancel(cardTickIntent(c));
+    }
+
+    static int kindColor(String kind) {
+        switch (kind) {
+            case "work": return 0xFF2F7A5F;
+            case "sport": return 0xFF9A7A1F;
+            case "together": return 0xFFA5566F;
+            case "personal": return 0xFF4F76A3;
+            case "meal": return 0xFF7D8150;
+            case "call": return 0xFF2F74A6;
+            case "sleep": return 0xFF6C62A6;
+            default: return GAP;
+        }
+    }
+
+    private static PendingIntent cardDismissIntent(Context c, String dayKey) {
+        return PendingIntent.getBroadcast(c, 2, new Intent(c, ReminderReceiver.class).setAction(A_CARD_DISMISSED).putExtra("day", dayKey), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /**
+     * «Ход дня»: every block of the day as a coloured segment from 09:30 to 00:30; the bar fills with time
+     * and the points mark the current activity. Android draws a limited number of segments, so the
+     * shortest ones are merged into a neighbour.
+     */
+    private static void showDayChart(Context c, JSONObject card, JSONArray blocks, String dayKey, int m, JSONObject current) {
+        NotificationManagerCompat nm = NotificationManagerCompat.from(c);
+        if (!card.optBoolean("dayChart", true) || blocks == null || blocks.length() == 0 || m < 570 || m >= 1470) { nm.cancel(DAY_ID); return; }
+        java.util.List<JSONObject> list = new java.util.ArrayList<>();
+        for (int i = 0; i < blocks.length(); i++) list.add(blocks.optJSONObject(i));
+        list.sort((a, b) -> a.optInt("start") - b.optInt("start"));
+        java.util.List<int[]> segs = new java.util.ArrayList<>();
+        int cursor = 570, total = 0, done = 0;
+        for (JSONObject x : list) {
+            int s = Math.max(cursor, x.optInt("start")), e = Math.min(1470, x.optInt("end"));
+            if (e <= s) continue;
+            if (s > cursor) segs.add(new int[]{s - cursor, GAP});
+            segs.add(new int[]{e - s, x.optBoolean("skipped") ? GAP : kindColor(x.optString("kind"))});
+            cursor = e;
+            if (!"sleep".equals(x.optString("kind"))) { total++; if (x.optBoolean("actualEnd")) done++; }
+        }
+        if (cursor < 1470) segs.add(new int[]{1470 - cursor, GAP});
+        while (segs.size() > 15) {
+            int k = 0;
+            for (int i = 1; i < segs.size(); i++) if (segs.get(i)[0] < segs.get(k)[0]) k = i;
+            int into = k == 0 ? 1 : k - 1;
+            segs.get(into)[0] += segs.get(k)[0];
+            segs.remove(k);
+        }
+        NotificationCompat.ProgressStyle ps = new NotificationCompat.ProgressStyle().setStyledByProgress(true);
+        for (int[] s : segs) ps.addProgressSegment(new NotificationCompat.ProgressStyle.Segment(s[0]).setColor(s[1]));
+        int progress = Math.max(0, Math.min(900, m - 570));
+        ps.setProgress(progress);
+        if (current != null) {
+            ps.addProgressPoint(new NotificationCompat.ProgressStyle.Point(Math.max(1, Math.min(899, current.optInt("start") - 570))).setColor(kindColor(current.optString("kind"))));
+            ps.addProgressPoint(new NotificationCompat.ProgressStyle.Point(Math.max(1, Math.min(899, current.optInt("end") - 570))).setColor(kindColor(current.optString("kind"))));
+        }
+        int left = Math.max(0, 1425 - m);
+        NotificationCompat.Builder d = new NotificationCompat.Builder(c, "day")
+            .setSmallIcon(R.drawable.ic_stat_ritm)
+            .setContentTitle("Ход дня · " + (progress * 100 / 900) + "%")
+            .setContentText("Сделано " + done + " из " + total + (left > 0 ? " · до подготовки ко сну " + (left >= 60 ? left / 60 + " ч " : "") + left % 60 + " мин" : ""))
+            .setStyle(ps)
+            .setOngoing(true).setOnlyAlertOnce(true).setSilent(true).setShowWhen(false)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(card.optBoolean("lockDetails") ? NotificationCompat.VISIBILITY_PUBLIC : NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(new NotificationCompat.Builder(c, "day").setSmallIcon(R.drawable.ic_stat_ritm).setContentTitle("Ритм").setContentText("Ход дня").build())
+            .setContentIntent(openApp(c, 9, action("open", dayKey, null)))
+            .setDeleteIntent(cardDismissIntent(c, dayKey));
+        if (card.optBoolean("live", true)) d.setRequestPromotedOngoing(true);
+        try { nm.notify(DAY_ID, d.build()); } catch (SecurityException ignored) {}
     }
 
     /** Draws the card for the current Moscow plan day and arms one alarm for the next block boundary. */
@@ -218,6 +298,7 @@ final class Notifier {
         String dayKey = day.toString();
         if (dayKey.equals(p.getString("cardDismissed", ""))) {
             NotificationManagerCompat.from(c).cancel(CARD_ID);
+            NotificationManagerCompat.from(c).cancel(DAY_ID);
             setAlarm(c, epoch(day.plusDays(1), 570), cardRefreshIntent(c));
             return;
         }
@@ -284,7 +365,22 @@ final class Notifier {
             .setVisibility(card.optBoolean("lockDetails") ? NotificationCompat.VISIBILITY_PUBLIC : NotificationCompat.VISIBILITY_PRIVATE)
             .setPublicVersion(new NotificationCompat.Builder(c, "day").setSmallIcon(R.drawable.ic_stat_ritm).setContentTitle("Ритм").setContentText("План дня").build())
             .setContentIntent(openApp(c, 2, sleepState && card.optBoolean("canEdit") ? route("sleep") : action("open", dayKey, null)))
-            .setDeleteIntent(PendingIntent.getBroadcast(c, 2, new Intent(c, ReminderReceiver.class).setAction(A_CARD_DISMISSED).putExtra("day", dayKey), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+            .setDeleteIntent(cardDismissIntent(c, dayKey));
+        // Live Update (Android 16+): шкала текущего занятия с точками «за 5 и за 1 минуту до конца» и обратный отсчёт в чипе строки состояния.
+        // Android закрепляет такое уведомление вверху шторки, если пользователь не выключил Live Updates для приложения.
+        boolean live = card.optBoolean("live", true);
+        if (live) b.setRequestPromotedOngoing(true);
+        if (live && current != null && !sleepState) {
+            int start = current.optInt("start"), end = current.optInt("end"), len = Math.max(1, end - start), done = Math.max(0, Math.min(len, m - start));
+            NotificationCompat.ProgressStyle ps = new NotificationCompat.ProgressStyle().setStyledByProgress(true)
+                .addProgressSegment(new NotificationCompat.ProgressStyle.Segment(len).setColor(kindColor(current.optString("kind"))))
+                .setProgress(done);
+            if (len > 10) ps.addProgressPoint(new NotificationCompat.ProgressStyle.Point(len - 5).setColor(WARN));
+            if (len > 3) ps.addProgressPoint(new NotificationCompat.ProgressStyle.Point(len - 1).setColor(WARN));
+            b.setStyle(ps)
+                .setContentText(clock(start) + "–" + clock(end) + " · " + (done * 100 / len) + "% · " + status + (next != null ? " · далее " + next.optString("title") + " в " + clock(next.optInt("start")) : ""))
+                .setWhen(epoch(day, end)).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true);
+        }
         if (card.optBoolean("canEdit") && sleepOpen != null) b.addAction(0, "Проснулся", openApp(c, 6, route("wake")));
         else if (card.optBoolean("canEdit") && sleepState) b.addAction(0, "Лёг спать", openApp(c, 7, route("bed")));
         else if (current != null && card.optBoolean("canEdit") && !current.optBoolean("locked")) {
@@ -293,6 +389,13 @@ final class Notifier {
         }
         b.addAction(0, "Открыть", openApp(c, 5, action("open", dayKey, null)));
         try { NotificationManagerCompat.from(c).notify(CARD_ID, b.build()); } catch (SecurityException ignored) {}
+        showDayChart(c, card, blocks, dayKey, m, sleepState ? null : current);
+        if ((live || card.optBoolean("dayChart", true)) && m >= 570 && m < 1470) {
+            long nextMinute = (System.currentTimeMillis() / 60000 + 1) * 60000;
+            AlarmManager am = c.getSystemService(AlarmManager.class);
+            if (exactAllowed(c)) am.setExact(AlarmManager.RTC, nextMinute, cardTickIntent(c));
+            else am.set(AlarmManager.RTC, nextMinute, cardTickIntent(c));
+        }
 
         int boundary = 1470 + 570; // tomorrow 09:30 by default
         if (blocks != null) for (int i = 0; i < blocks.length(); i++) {
