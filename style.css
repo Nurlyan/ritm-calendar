@@ -524,3 +524,20 @@ dialog{z-index:50}
 dialog{box-shadow:none}
 dialog[open]>*{animation:sheet-fade .3s ease both}
 @keyframes sheet-fade{from{opacity:0}}
+
+/* 1.8 · панель: крестик всегда сверху (анимация делает детей отдельными слоями), видимая полоса для тапа мимо, ручка для свайпа */
+dialog{max-height:84dvh}
+dialog .close{z-index:6}
+dialog[open]>.close{animation:none}
+dialog::before{width:52px;height:6px;margin:-14px auto 16px;background:var(--faint);opacity:.55}
+/* Понятные кнопки и поля: «второстепенные» кнопки с рамкой, поля контрастнее, подсказки под действиями */
+.ghost{border:1px solid var(--field-edge);background:transparent;color:var(--accent)}
+.mark-panel .ghost{width:100%;margin-top:8px}
+.mark-panel .hint{margin:6px 2px 0;font-size:.82rem;color:var(--muted);line-height:1.35}
+.form-title{margin:20px 0 8px;font-size:1rem;color:var(--ink-2)}
+input,textarea,select{border-width:1.5px}
+:root{--field-edge:rgba(23,39,31,.22)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--field:rgba(255,255,255,.09);--field-edge:rgba(255,255,255,.26)}}
+:root[data-theme=dark]{--field:rgba(255,255,255,.09);--field-edge:rgba(255,255,255,.26)}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);outline:2px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:1px}
+:root[data-theme=light]{--field-edge:rgba(23,39,31,.22)}

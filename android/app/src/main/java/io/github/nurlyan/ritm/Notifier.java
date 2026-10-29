@@ -394,7 +394,11 @@ final class Notifier {
             if (!current.optBoolean("actualStart")) b.addAction(0, "Начать", openApp(c, 3, action("start", dayKey, current.optString("id"))));
             else if (!current.optBoolean("actualEnd")) b.addAction(0, "Завершить", openApp(c, 4, action("finish", dayKey, current.optString("id"))));
         }
-        b.addAction(0, "Открыть", openApp(c, 5, action("open", dayKey, null)));
+        // Android показывает до трёх кнопок: владельцу вместо «Открыть» (нажатие на карточку и так открывает приложение) — быстрые записи в дневник.
+        if (card.optBoolean("canEdit") && !sleepState) {
+            b.addAction(0, "Головная боль", openApp(c, 11, route("headache")));
+            b.addAction(0, "Самочувствие", openApp(c, 12, route("wellbeing")));
+        } else b.addAction(0, "Открыть", openApp(c, 5, action("open", dayKey, null)));
         try { NotificationManagerCompat.from(c).notify(CARD_ID, b.build()); } catch (SecurityException ignored) {}
         showDayChart(c, card, blocks, dayKey, m, sleepState ? null : current);
         if ((live || card.optBoolean("dayChart", true)) && m >= 570 && m < 1470) {

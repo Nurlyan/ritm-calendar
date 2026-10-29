@@ -50,7 +50,7 @@ test('перерывы выключены по умолчанию и не мен
 
 test('напоминание об эффекте только по явно заданному времени',()=>{
  const health=[{id:'m1',kind:'migraine',day:today,payload:{treatments:[{name:'x',effect:'unknown',remindAt:'2026-10-27T09:00:00Z'},{name:'y',effect:'full',remindAt:'2026-10-27T09:00:00Z'},{name:'z',effect:'unknown'}]}}];
- const list=run({health}).filter(r=>r.channel==='diaries');
+ const list=run({health}).filter(r=>r.channel==='diaries'&&r.key.startsWith('effect:'));
  assert.equal(list.length,1);
  assert.equal(list[0].title,'Пора дополнить дневник');
 });
@@ -91,4 +91,12 @@ test('за 5 и за 1 минуту до конца — одно уведомл�
  assert.ok(r.every(x=>x.notifyKey===`soon:${today}:${work.id}`&&x.buttons[0].action.op==='done'));
  assert.ok(!run().some(x=>x.key.startsWith('soon')&&x.key.includes(bl.find(b=>b.kind==='sleep').id)));
  plan[today]=bl.map(b=>b.id===work.id?{...b,actualEnd:'x'}:b);const after=run().filter(x=>x.key.startsWith('soon')&&x.key.endsWith(work.id));delete plan[today];assert.equal(after.length,0);
+});
+
+test('вечером «Как прошёл день?», если вечерней оценки ещё нет',()=>{
+ const e=run().find(x=>x.key===`evening:${today}`);
+ assert.ok(e);assert.equal(e.route,'wellbeing');assert.equal(e.at,new Date(`${today}T23:30:00+03:00`).getTime());assert.ok(e.sensitive);
+ const done=run({health:[{kind:'wellbeing',day:today,payload:{at:`${today}T19:00:00+03:00`,score:7}}]});assert.ok(!done.some(x=>x.key===`evening:${today}`));
+ const morningOnly=run({health:[{kind:'wellbeing',day:today,payload:{at:`${today}T10:00:00+03:00`,score:7}}]});assert.ok(morningOnly.some(x=>x.key===`evening:${today}`));
+ assert.ok(!buildReminders({dayPlan,today,now,role:'viewer',s,days:1}).some(x=>x.key.startsWith('evening:')));
 });
