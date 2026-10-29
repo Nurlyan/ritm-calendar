@@ -111,7 +111,12 @@ public class RitmPlugin extends Plugin {
         }
         r.put("channels", channels);
         r.put("cardVisible", false);
-        for (android.service.notification.StatusBarNotification n : nm.getActiveNotifications()) if (n.getId() == Notifier.CARD_ID) r.put("cardVisible", true);
+        r.put("chartVisible", false);
+        for (android.service.notification.StatusBarNotification n : nm.getActiveNotifications()) {
+            if (n.getId() == Notifier.CARD_ID) r.put("cardVisible", true);
+            if (n.getId() == Notifier.DAY_ID) r.put("chartVisible", true);
+        }
+        r.put("chartDismissed", Notifier.prefs(c).getString("chartDismissed", ""));
         try { r.put("scheduled", new JSONArray(Notifier.prefs(c).getString("reminders", "[]")).length()); } catch (org.json.JSONException e) { r.put("scheduled", 0); }
         r.put("sdk", Build.VERSION.SDK_INT);
         r.put("promoted", NotificationManagerCompat.from(c).canPostPromotedNotifications());
@@ -185,7 +190,7 @@ public class RitmPlugin extends Plugin {
         try {
             JSObject data = call.getObject("card", new JSObject());
             android.content.SharedPreferences.Editor e = Notifier.prefs(getContext()).edit().putString("card", data.toString());
-            if (call.getBoolean("restore", false)) e.remove("cardDismissed");
+            if (call.getBoolean("restore", false)) e.remove("cardDismissed").remove("chartDismissed");
             e.apply();
             Notifier.refreshCard(getContext());
             call.resolve();

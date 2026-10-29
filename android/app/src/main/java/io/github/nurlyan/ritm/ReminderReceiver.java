@@ -25,7 +25,7 @@ public class ReminderReceiver extends BroadcastReceiver {
                     break;
                 case Notifier.A_CARD_DISMISSED:
                     // The user removed the card: respect that until the next plan day or until they bring it back in the app.
-                    Notifier.prefs(c).edit().putString("cardDismissed", intent.getStringExtra("day")).apply();
+                    Notifier.prefs(c).edit().putString(intent.getBooleanExtra("chart", false) ? "chartDismissed" : "cardDismissed", intent.getStringExtra("day")).apply();
                     Notifier.refreshCard(c);
                     break;
                 default: // boot, package update, time / timezone change, exact alarm permission change

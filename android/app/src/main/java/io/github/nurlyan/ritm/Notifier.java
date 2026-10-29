@@ -139,6 +139,7 @@ final class Notifier {
             .setOngoing(r.optBoolean("sticky"))
             .setPriority(r.optBoolean("sticky") ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setTimeoutAfter(r.optInt("timeoutMin", 0) > 0 ? r.optInt("timeoutMin") * 60000L : 0)
             .setContentIntent(openApp(c, id, action))
             .setVisibility(sensitive || !lockDetails ? NotificationCompat.VISIBILITY_PRIVATE : NotificationCompat.VISIBILITY_PUBLIC)
             .setPublicVersion(new NotificationCompat.Builder(c, r.optString("channel", "activities"))
@@ -166,9 +167,10 @@ final class Notifier {
         try {
             JSONArray list = new JSONArray(prefs(c).getString("reminders", "[]"));
             for (int i = 0; i < list.length(); i++) {
-                String key = list.getJSONObject(i).optString("key");
+                JSONObject r = list.getJSONObject(i);
+                String key = r.optString("key");
                 if (!key.startsWith(prefix)) continue;
-                nm.cancel(notificationId(key));
+                nm.cancel(notificationId(r.optString("notifyKey", key)));
                 nm.cancel(notificationId(key + ":snooze"));
             }
         } catch (JSONException ignored) {}
@@ -230,6 +232,10 @@ final class Notifier {
         return PendingIntent.getBroadcast(c, 2, new Intent(c, ReminderReceiver.class).setAction(A_CARD_DISMISSED).putExtra("day", dayKey), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    private static PendingIntent chartDismissIntent(Context c, String dayKey) {
+        return PendingIntent.getBroadcast(c, 10, new Intent(c, ReminderReceiver.class).setAction(A_CARD_DISMISSED).putExtra("day", dayKey).putExtra("chart", true), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
     /**
      * «Ход дня»: every block of the day as a coloured segment from 09:30 to 00:30; the bar fills with time
      * and the points mark the current activity. Android draws a limited number of segments, so the
@@ -237,7 +243,8 @@ final class Notifier {
      */
     private static void showDayChart(Context c, JSONObject card, JSONArray blocks, String dayKey, int m, JSONObject current) {
         NotificationManagerCompat nm = NotificationManagerCompat.from(c);
-        if (!card.optBoolean("dayChart", true) || blocks == null || blocks.length() == 0 || m < 570 || m >= 1470) { nm.cancel(DAY_ID); return; }
+        if (!card.optBoolean("dayChart", true) || blocks == null || blocks.length() == 0 || m < 570 || m >= 1470
+            || dayKey.equals(prefs(c).getString("chartDismissed", ""))) { nm.cancel(DAY_ID); return; }
         java.util.List<JSONObject> list = new java.util.ArrayList<>();
         for (int i = 0; i < blocks.length(); i++) list.add(blocks.optJSONObject(i));
         list.sort((a, b) -> a.optInt("start") - b.optInt("start"));
@@ -279,7 +286,7 @@ final class Notifier {
             .setVisibility(card.optBoolean("lockDetails") ? NotificationCompat.VISIBILITY_PUBLIC : NotificationCompat.VISIBILITY_PRIVATE)
             .setPublicVersion(new NotificationCompat.Builder(c, "day").setSmallIcon(R.drawable.ic_stat_ritm).setContentTitle("Ритм").setContentText("Ход дня").build())
             .setContentIntent(openApp(c, 9, action("open", dayKey, null)))
-            .setDeleteIntent(cardDismissIntent(c, dayKey));
+            .setDeleteIntent(chartDismissIntent(c, dayKey));
         if (card.optBoolean("live", true)) d.setRequestPromotedOngoing(true);
         try { nm.notify(DAY_ID, d.build()); } catch (SecurityException ignored) {}
     }
@@ -308,7 +315,7 @@ final class Notifier {
         if (blocks != null) {
             for (int i = 0; i < blocks.length(); i++) {
                 JSONObject b = blocks.optJSONObject(i);
-                if (b.optBoolean("actualStart") && !b.optBoolean("actualEnd")) { current = b; break; }
+                if (b.optBoolean("actualStart") && !b.optBoolean("actualEnd") && b.optInt("start") <= m && m < b.optInt("end") + 60) { current = b; break; }
             }
             for (int i = 0; current == null && i < blocks.length(); i++) {
                 JSONObject b = blocks.optJSONObject(i);
