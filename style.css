@@ -95,8 +95,8 @@ main{min-height:100dvh;padding-bottom:calc(var(--tabbar) + var(--safe-bottom) + 
 .sync i,.live-dot{width:7px;height:7px;border-radius:50%;background:#3fb37f;flex-shrink:0;box-shadow:0 0 0 3px color-mix(in srgb,#3fb37f 22%,transparent)}
 .sync.warn i{background:#e0a43a;box-shadow:0 0 0 3px rgba(224,164,58,.22)}
 .page{max-width:1180px;margin:auto;padding:18px 16px 8px}
-.page>*{animation:rise .42s var(--ease) both}
-.page>*:nth-child(2){animation-delay:.03s}.page>*:nth-child(3){animation-delay:.06s}.page>*:nth-child(4){animation-delay:.09s}.page>*:nth-child(5){animation-delay:.12s}
+.page.enter>*{animation:rise .42s var(--ease) both}
+.page.enter>*:nth-child(2){animation-delay:.03s}.page.enter>*:nth-child(3){animation-delay:.06s}.page.enter>*:nth-child(4){animation-delay:.09s}.page.enter>*:nth-child(5){animation-delay:.12s}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 footer{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:28px 4px 8px;color:var(--faint);font-size:.8rem;font-weight:800}
 footer span{font-weight:500}
@@ -146,7 +146,8 @@ footer span{font-weight:500}
 .tl-item .ico{width:18px;height:18px;color:var(--faint)}
 .timeline li+li::before{content:'';position:absolute;left:calc(4px + 52px + 10px + 6px);top:-12px;height:24px;width:2px;background:var(--hairline)}
 .tl-item.now{background:var(--kb)}
-.tl-item.now .tl-dot{animation:pulse 2.4s ease-in-out infinite}
+.tl-item.now .tl-dot{position:relative;isolation:isolate}.tl-item.now .tl-dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;background:var(--kb);z-index:-1;animation:halo 2.4s ease-in-out infinite}
+@keyframes halo{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.5}}
 .tl-item.past{opacity:.55}
 .tl-item.done .tl-body strong{text-decoration:line-through;text-decoration-color:var(--faint)}
 @keyframes pulse{50%{box-shadow:0 0 0 8px var(--kb)}}
@@ -348,7 +349,7 @@ details summary{cursor:pointer;padding:10px 0;font-weight:650;color:var(--accent
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 :root[data-lite] .sidebar,:root[data-lite] .topbar,:root[data-lite] dialog,:root[data-lite] #toast{backdrop-filter:none;-webkit-backdrop-filter:none}
 :root[data-lite] .sidebar,:root[data-lite] .topbar{background:var(--glass-strong)}
-:root[data-lite] .page>*,:root[data-lite] .tl-item.now .tl-dot{animation:none}
+:root[data-lite] .page>*,:root[data-lite] .tl-item.now .tl-dot::after{animation:none}
 @media(prefers-reduced-transparency:reduce){.sidebar,.topbar,dialog{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--glass-strong)}}
 
 /* Широкий экран: боковая панель и неделя */
@@ -500,3 +501,26 @@ dialog.closing::backdrop{animation:fade-out .22s ease both}
 .sacrifice .choice strong{font-weight:750}
 .sacrifice .choice small{color:var(--muted);font-weight:500;font-size:.84rem;line-height:1.3}
 .sacrifice .activity-icon{flex-shrink:0}
+/* 1.6 · отметка: вовремя, сейчас или своё время */
+.when{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 4px}
+.when>button,.when>label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:58px;padding:8px 6px;border-radius:16px;background:var(--field);border:1px solid var(--field-edge);font-weight:700;font-size:.9rem;color:var(--ink);box-shadow:none;transition:background .2s,color .2s,border-color .2s}
+.when small{font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.when>label{margin:0;position:relative}
+.when input[type=time]{min-height:0;height:26px;padding:0 4px;border:0;background:transparent;text-align:center;font-weight:650;font-size:.85rem;color:var(--muted);width:100%}
+.when .selected{background:var(--kb,var(--accent-soft));border-color:var(--accent);color:var(--ink)}
+.when .selected small,.when .selected input{color:var(--accent)}
+.mark-panel{margin:12px 0 4px;padding:14px;border-radius:18px;background:var(--field);border:1px solid var(--field-edge)}
+.mark-panel h3{margin:0 0 10px}
+.mark-panel>p{margin:0 0 8px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.mark-panel .primary{width:100%}
+.mark-panel .actual-actions{margin-top:8px}
+/* 1.6 · панели без модального режима: своя подложка, на время панели — без размытия у верхней и нижней полос */
+dialog{z-index:50}
+#scrim{position:fixed;inset:0;z-index:45;background:rgba(8,18,14,.42);opacity:0;pointer-events:none;touch-action:none;transition:opacity .3s ease}
+#scrim.on{opacity:1;pointer-events:auto}
+.sheet-open .sidebar,.sheet-open .topbar{backdrop-filter:none;-webkit-backdrop-filter:none}
+@media(prefers-reduced-motion:reduce){#scrim{transition:none}}
+/* 1.6 · плавность панели: большая размытая тень у выезжающего листа перегружала видеокарту (замер на Pixel 8: 4,5% → 0,6% медленных кадров). Затемнение фона даёт глубину без тени; содержимое проявляется без сдвига. */
+dialog{box-shadow:none}
+dialog[open]>*{animation:sheet-fade .3s ease both}
+@keyframes sheet-fade{from{opacity:0}}

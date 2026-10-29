@@ -198,7 +198,9 @@ public class RitmPlugin extends Plugin {
 
     @PluginMethod
     public void dismiss(PluginCall call) {
-        Notifier.dismiss(getContext(), call.getString("prefix", "\u0000"));
+        String key = call.getString("key");
+        if (key != null) Notifier.dismissKey(getContext(), key);
+        else Notifier.dismiss(getContext(), call.getString("prefix", "\u0000"));
         call.resolve();
     }
 

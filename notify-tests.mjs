@@ -70,3 +70,16 @@ test('вечернее напоминание открывает «Лёг спа
  assert.ok(!open.some(r=>r.key==='bed:2026-10-27'));
  assert.match(open.find(r=>r.key==='morning:2026-10-28').text,/Вы легли в 00:00/);
 });
+
+test('«Отметьте» через 5 минут после конца блока, кроме сна и уже отмеченных',()=>{
+ const r=run().filter(x=>x.key.startsWith('mark:'+today));
+ const bl=base(weekday(today)),morning=bl[0];
+ const m=r.find(x=>x.key===`mark:${today}:${morning.id}`);
+ assert.ok(m);assert.equal(m.at,new Date(`${today}T10:05:00+03:00`).getTime());
+ assert.deepEqual(m.buttons.map(b=>b.action.op),['done','skip']);assert.equal(m.action.op,'mark');
+ assert.ok(!r.some(x=>x.key.includes(bl.find(b=>b.kind==='sleep').id)));
+ plan[today]=bl.map((b,i)=>i===0?{...b,actualStart:'x',actualEnd:'y'}:i===1?{...b,skipped:true}:b);
+ const after=run().filter(x=>x.key.startsWith('mark:'+today));delete plan[today];
+ assert.ok(!after.some(x=>x.key.endsWith(bl[0].id)||x.key.endsWith(bl[1].id)));
+ assert.equal(buildReminders({dayPlan,today,now,role:'viewer',s,days:1}).filter(x=>x.key.startsWith('mark:')).length,0);
+});

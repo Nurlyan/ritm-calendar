@@ -125,6 +125,9 @@ final class Notifier {
         boolean sensitive = r.optBoolean("sensitive"), lockDetails = prefs(c).getBoolean("lockDetails", false);
         JSONObject action = new JSONObject();
         try { action.put("route", r.optString("route", "today")).put("key", key); } catch (JSONException ignored) {}
+        // A reminder may carry its own app action and up to two extra buttons («Отметьте занятие»).
+        JSONObject own = r.optJSONObject("action");
+        if (own != null) action = own;
         NotificationCompat.Builder b = new NotificationCompat.Builder(c, r.optString("channel", "activities"))
             .setSmallIcon(R.drawable.ic_stat_ritm)
             .setContentTitle(r.optString("title"))
@@ -140,6 +143,11 @@ final class Notifier {
                 .setSmallIcon(R.drawable.ic_stat_ritm).setContentTitle("Ритм")
                 .setContentText(sensitive ? "Пора дополнить дневник" : "Напоминание о плане дня").build());
         if (r.optBoolean("sticky")) b.addAction(0, "Отметить подъём", openApp(c, id ^ 0x2000, action));
+        JSONArray buttons = r.optJSONArray("buttons");
+        for (int i = 0; buttons != null && i < buttons.length() && i < 2; i++) {
+            JSONObject btn = buttons.optJSONObject(i);
+            if (btn != null && btn.optJSONObject("action") != null) b.addAction(0, btn.optString("title"), openApp(c, id ^ (0x3000 + i), btn.optJSONObject("action")));
+        }
         if (r.optBoolean("snooze", true)) {
             int minutes = prefs(c).getInt("snoozeMinutes", 10);
             Intent s = new Intent(c, ReminderReceiver.class).setAction(A_SNOOZE).setData(Uri.parse("ritm://snooze/" + Uri.encode(key)))
@@ -162,6 +170,13 @@ final class Notifier {
                 nm.cancel(notificationId(key + ":snooze"));
             }
         } catch (JSONException ignored) {}
+    }
+
+    /** Removes one shown notification by its exact key, even after its reminder left the schedule. */
+    static void dismissKey(Context c, String key) {
+        NotificationManagerCompat nm = NotificationManagerCompat.from(c);
+        nm.cancel(notificationId(key));
+        nm.cancel(notificationId(key + ":snooze"));
     }
 
     /** Snoozing only re-posts the notification later. It never moves the activity, sleep or the call. */

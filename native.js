@@ -14,6 +14,7 @@ export const card=(data,restore=false)=>call('card',{card:data,restore});
 export const test=channel=>call('test',{channel});
 export const haptic=(kind='tick')=>{if(isNative)call('haptic',{kind}).catch(()=>{})};
 // Убирает закреплённое утреннее напоминание, когда подъём отмечен.
+export const dismissKey=key=>{if(isNative)call('dismiss',{key}).catch(()=>{})};
 export const dismissMorning=()=>{if(isNative)call('dismiss',{prefix:'morning:'}).catch(()=>{})};
 // Фоновая проверка предложений (Android WorkManager, примерно раз в 15 минут при наличии сети).
 let inboxOn=false;
