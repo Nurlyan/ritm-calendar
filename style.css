@@ -552,3 +552,4 @@ dialog{padding-left:calc(20px + var(--safe-left));padding-right:calc(20px + var(
 @media(max-width:350px){.page{padding-left:12px;padding-right:12px}dialog{padding-left:14px;padding-right:14px}.navitem span{font-size:.7rem}.dnd-dur button{width:28px}}
 @media(orientation:landscape) and (max-height:500px){dialog{max-height:92dvh}.hero h2{font-size:1.5rem}}
 @media(max-width:380px){.hero-top{gap:6px}.hero-top .chip{padding:5px 10px;font-size:.8rem}.hero-top .chip .ico{width:15px;height:15px}}
+.card-head h2{white-space:nowrap}.card-actions{flex-wrap:wrap;justify-content:flex-end}.card-actions .text-button{padding:6px 4px;font-size:.86rem}
