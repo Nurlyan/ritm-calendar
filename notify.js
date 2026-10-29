@@ -5,7 +5,10 @@ const KEY='ritm-notify-v1',$=s=>document.querySelector(s),esc=s=>String(s??'').r
 export const kindNames={work:'Работа',sport:'Спорт',together:'Вместе',personal:'Для себя',meal:'Обед / отдых',call:'Созвон'};
 export const defaults=()=>({enabled:true,card:false,live:true,dayChart:true,lockDetails:false,snoozeMinutes:10,lead:5,endingLead:10,workMinutes:50,breakMinutes:10,morning:'09:35',bedtime:'00:00',evening:'23:30',quietFrom:'00:30',quietTo:'09:30',
  types:{start:true,ending:false,confirm:true,breaks:false,mark:true,morning:true,evening:true,bedtime:true,effect:true},kinds:{work:true,sport:true,together:true,personal:false,meal:false,call:true}});
-export function settings(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return {...defaults(),...s,types:{...defaults().types,...s.types},kinds:{...defaults().kinds,...s.kinds}}}catch{}return defaults()}
+// Профиль просмотра по умолчанию получает напоминания только о совместном времени, а не обо всех его занятиях.
+let profileRole='owner';
+const baseFor=r=>{const d=defaults();if(r==='viewer')d.kinds={work:false,sport:false,together:true,personal:false,meal:false,call:false};return d};
+export function settings(){const d=baseFor(profileRole);try{const s=JSON.parse(localStorage.getItem(KEY));if(s)return {...d,...s,types:{...d.types,...s.types},kinds:{...d.kinds,...s.kinds}}}catch{}return d}
 function saveSettings(s){localStorage.setItem(KEY,JSON.stringify(s))}
 
 const at=(day,m)=>new Date(day+'T00:00:00+03:00').getTime()+m*60000; // Москва — постоянный UTC+3
@@ -49,6 +52,7 @@ function cardDays(dayPlan,today){const days={};for(const d of [shift(today,-1),t
 let last='';
 /** Передаёт план в Android. Вызывается после загрузки и любых изменений; одинаковые данные повторно не отправляются. */
 export async function sync({dayPlan,today,role,health,sleep=[],sleepOpen=null,loggedIn},restore=false){
+ profileRole=role||'owner';
  if(!native.isNative)return;
  if(restore)last='';
  const s=settings();
@@ -64,7 +68,7 @@ export const resync=()=>{last=''};
 const planDayKey=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Moscow'}).format(new Date(Date.now()-9*3600000));
 const sw=(name,label,on,hint='')=>`<label class="switch"><span><strong>${label}</strong>${hint?`<small>${hint}</small>`:''}</span><input type="checkbox" data-set="${name}" ${on?'checked':''}><i aria-hidden="true"></i></label>`;
 export async function settingsView(role){
- const s=settings(),owner=role==='owner';
+ profileRole=role||'owner';const s=settings(),owner=role==='owner';
  if(!native.isNative)return `<p class="eyebrow">УВЕДОМЛЕНИЯ</p><h1>Напоминания</h1><section class="glass section"><p>Напоминания и карточка дня работают в Android-приложении «Ритм». На сайте они недоступны.</p></section>`;
  const st=await native.status().catch(()=>null)||{};
  const problem=!st.notifications?`<div class="notice warning"><strong>Уведомления выключены</strong><p>Без разрешения Android не покажет ни напоминания, ни карточку дня.</p><button class="primary" id="perm-notify">Разрешить уведомления</button> <button data-open-settings="notifications">Открыть настройки Android</button></div>`:'';

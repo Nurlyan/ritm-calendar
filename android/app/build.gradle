@@ -4,11 +4,13 @@ android {
     namespace = "io.github.nurlyan.ritm"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "io.github.nurlyan.ritm"
+        // -PritmTestCopy ÑÐ¾Ð±Ð¸Ñ€Ð°ÐµÑ‚ Ñ‚ÐµÑÑ‚Ð¾Ð²ÑƒÑŽ ÐºÐ¾Ð¿Ð¸ÑŽ Ñ€ÑÐ´Ð¾Ð¼ Ñ Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ (Ð´Ð»Ñ Ð²Ñ…Ð¾Ð´Ð° Ð²Ð¾ Ð²Ñ‚Ð¾Ñ€Ð¾Ð¹ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»ÑŒ Ð½Ð° Ñ‚Ð¾Ð¼ Ð¶Ðµ Ñ‚ÐµÐ»ÐµÑ„Ð¾Ð½Ðµ).
+        applicationId project.hasProperty("ritmTestCopy") ? "io.github.nurlyan.ritm.testcopy" : "io.github.nurlyan.ritm"
+        manifestPlaceholders = [appLabel: project.hasProperty("ritmTestCopy") ? "Ð Ð¸Ñ‚Ð¼ Â· Ñ‚ÐµÑÑ‚" : "@string/app_name"]
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName "1.8.0-test"
+        versionCode 10
+        versionName "1.8.1-test"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
