@@ -543,3 +543,4 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);outline:2px s
 :root[data-theme=light]{--field-edge:rgba(23,39,31,.22)}
 .login-card form{display:grid;gap:12px}.login-card input{font-size:1.1rem;min-height:54px}.login-card .subtle{margin-top:12px}
 .sidebar:has(.tabbar:empty){display:none}
+#notify-ask .q-ico{background:var(--accent-soft);color:var(--accent)}
