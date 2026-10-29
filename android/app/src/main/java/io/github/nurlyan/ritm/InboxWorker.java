@@ -38,7 +38,8 @@ public class InboxWorker extends Worker {
     static void start(Context c) {
         Constraints net = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
         PeriodicWorkRequest req = new PeriodicWorkRequest.Builder(InboxWorker.class, 15, TimeUnit.MINUTES).setConstraints(net).build();
-        WorkManager.getInstance(c).enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, req);
+        // UPDATE, not KEEP: seen on Android 17 — after an app update the scheduled job was gone while the work stayed recorded as enqueued; updating re-schedules it.
+        WorkManager.getInstance(c).enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.UPDATE, req);
         // One immediate check on app start; periodic runs continue about every 15 minutes.
         androidx.work.OneTimeWorkRequest now = new androidx.work.OneTimeWorkRequest.Builder(InboxWorker.class).setConstraints(net).build();
         WorkManager.getInstance(c).enqueueUniqueWork(NAME + "-now", androidx.work.ExistingWorkPolicy.REPLACE, now);

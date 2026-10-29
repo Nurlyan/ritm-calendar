@@ -32,6 +32,8 @@ public class ReminderReceiver extends BroadcastReceiver {
                     Notifier.ensureChannels(c);
                     Notifier.armAll(c);
                     Notifier.refreshCard(c);
+                    // Background check for proposals survives updates and reboots without opening the app.
+                    if (Notifier.prefs(c).getString("inboxUrl", null) != null) InboxWorker.start(c);
             }
         } catch (Exception ignored) {
             // Never crash a broadcast; the next app start re-arms everything.
