@@ -541,3 +541,5 @@ input,textarea,select{border-width:1.5px}
 :root[data-theme=dark]{--field:rgba(255,255,255,.09);--field-edge:rgba(255,255,255,.26)}
 input:focus,textarea:focus,select:focus{border-color:var(--accent);outline:2px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:1px}
 :root[data-theme=light]{--field-edge:rgba(23,39,31,.22)}
+.login-card form{display:grid;gap:12px}.login-card input{font-size:1.1rem;min-height:54px}.login-card .subtle{margin-top:12px}
+.sidebar:has(.tabbar:empty){display:none}

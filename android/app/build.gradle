@@ -4,13 +4,13 @@ android {
     namespace = "io.github.nurlyan.ritm"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        // -PritmTestCopy ÑÐ¾Ð±Ð¸Ñ€Ð°ÐµÑ‚ Ñ‚ÐµÑÑ‚Ð¾Ð²ÑƒÑŽ ÐºÐ¾Ð¿Ð¸ÑŽ Ñ€ÑÐ´Ð¾Ð¼ Ñ Ð¾ÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ (Ð´Ð»Ñ Ð²Ñ…Ð¾Ð´Ð° Ð²Ð¾ Ð²Ñ‚Ð¾Ñ€Ð¾Ð¹ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»ÑŒ Ð½Ð° Ñ‚Ð¾Ð¼ Ð¶Ðµ Ñ‚ÐµÐ»ÐµÑ„Ð¾Ð½Ðµ).
+        // -PritmTestCopy Ã‘ÂÃÂ¾ÃÂ±ÃÂ¸Ã‘â‚¬ÃÂ°ÃÂµÃ‘â€š Ã‘â€šÃÂµÃ‘ÂÃ‘â€šÃÂ¾ÃÂ²Ã‘Æ’Ã‘Å½ ÃÂºÃÂ¾ÃÂ¿ÃÂ¸Ã‘Å½ Ã‘â‚¬Ã‘ÂÃÂ´ÃÂ¾ÃÂ¼ Ã‘Â ÃÂ¾Ã‘ÂÃÂ½ÃÂ¾ÃÂ²ÃÂ½ÃÂ¾ÃÂ¹ (ÃÂ´ÃÂ»Ã‘Â ÃÂ²Ã‘â€¦ÃÂ¾ÃÂ´ÃÂ° ÃÂ²ÃÂ¾ ÃÂ²Ã‘â€šÃÂ¾Ã‘â‚¬ÃÂ¾ÃÂ¹ ÃÂ¿Ã‘â‚¬ÃÂ¾Ã‘â€žÃÂ¸ÃÂ»Ã‘Å’ ÃÂ½ÃÂ° Ã‘â€šÃÂ¾ÃÂ¼ ÃÂ¶ÃÂµ Ã‘â€šÃÂµÃÂ»ÃÂµÃ‘â€žÃÂ¾ÃÂ½ÃÂµ).
         applicationId project.hasProperty("ritmTestCopy") ? "io.github.nurlyan.ritm.testcopy" : "io.github.nurlyan.ritm"
-        manifestPlaceholders = [appLabel: project.hasProperty("ritmTestCopy") ? "Ð Ð¸Ñ‚Ð¼ Â· Ñ‚ÐµÑÑ‚" : "@string/app_name"]
+        manifestPlaceholders = [appLabel: project.hasProperty("ritmTestCopy") ? "ÃÂ ÃÂ¸Ã‘â€šÃÂ¼ Ã‚Â· Ã‘â€šÃÂµÃ‘ÂÃ‘â€š" : "@string/app_name"]
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10
-        versionName "1.8.1-test"
+        versionCode 11
+        versionName "1.8.2-test"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
