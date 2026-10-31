@@ -41,10 +41,18 @@ const fixedOf=(blocks,pinned)=>blocks.filter(b=>b.locked||b.kind==='sleep'||pinn
 const minutesOf=list=>list.reduce((n,b)=>n+b.end-b.start,0);
 export function swapDays(wed,thu){return [structuredClone(thu).map(b=>({...b,id:crypto.randomUUID()})),structuredClone(wed).map(b=>({...b,id:crypto.randomUUID()}))]}
 // Day editor: movable blocks follow each other in the chosen order starting at `from`.
-// The call, the bedtime block and anything in `pinned` keep their time; what no longer fits before bedtime is deferred.
+// A block with `at` (start set by hand) starts there: later than the previous block leaves a gap, earlier shortens
+// the previous block (never below 5 minutes). The call, the bedtime block and anything in `pinned` keep their time;
+// what no longer fits before bedtime is deferred.
 export function pack(blocks,order,{from=570,pinned=[]}={}){
- const fixed=fixedOf(blocks,pinned),r=place(order.filter(b=>!fixed.some(f=>f.id===b.id)),fixed,from);
- return {blocks:[...r.placed,...fixed].sort((a,b)=>a.start-b.start),deferred:r.deferred};
+ const fixed=fixedOf(blocks,pinned),placed=[],deferred=[];let cursor=from;
+ for(const b of order){if(fixed.some(f=>f.id===b.id))continue;const len=b.end-b.start;let s=cursor;
+  if(Number.isInteger(b.at)&&b.at>=570){s=b.at;const prev=placed.at(-1);if(s<cursor){if(prev&&s-prev.start>=5)prev.end=s;else s=cursor}}
+  s=clear(s,len,fixed);
+  if(s+len>1470){deferred.push(b);continue}
+  placed.push({...b,start:s,end:s+len});cursor=s+len}
+ const strip=({at,...b})=>b;
+ return {blocks:[...placed,...fixed].map(strip).sort((a,b)=>a.start-b.start),deferred:deferred.map(strip)};
 }
 // Minutes the day would run past bedtime preparation if deferred blocks were appended after the placed ones.
 export function overrun(blocks,deferred,{pinned=[]}={}){

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Marker of the current moment on the «Ход дня» bar: a white dot with a dark ring, visible on every segment colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+    <path
+        android:fillColor="#FF0D1512"
+        android:pathData="M8,0a8,8 0 1,0 0.001,0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,3a5,5 0 1,0 0.001,0z" />
+</vector>

@@ -28,7 +28,7 @@ export function inboxSeen(since){if(isNative&&since&&since!==seenSent){seenSent=
 export function barsStyle(theme){if(isNative)cap.nativePromise('SystemBars','setStyle',{style:theme==='dark'?'DARK':theme==='light'?'LIGHT':'DEFAULT'}).catch(()=>{})}
 // Цвет системных полос = фон приложения (на Android 14 и старше полосы рисуются отдельно от страницы).
 export function barColors(){if(!isNative)return;requestAnimationFrame(()=>{const m=getComputedStyle(document.body).backgroundColor.match(/\d+(\.\d+)?/g)||[13,21,18],[r,g,b]=m.map(Number),hex='#'+[r,g,b].map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');call('barColors',{color:hex,dark:(0.299*r+0.587*g+0.114*b)<140}).catch(()=>{})})}
-matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>barColors());
+globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',()=>barColors());
 export const takeAction=async()=>isNative?(await call('takeAction').catch(()=>null))?.action||null:null;
 export function onAction(handler){if(isNative)cap.nativeCallback('RitmNative','addListener',{eventName:'action'},handler)}
 

@@ -31,12 +31,13 @@ final class Notifier {
     static final ZoneId MSK = ZoneId.of("Europe/Moscow");
     static final String PREFS = "ritm_native";
     static final int CARD_ID = 1, DAY_ID = 8;
-    private static final int GAP = 0xFF9AA3A0, WARN = 0xFFE0A030;
+    private static final int GAP = 0xFF7D8682, WARN = 0xFFE0A030;
     static final String A_REMIND = "io.github.nurlyan.ritm.REMIND", A_SNOOZE = "io.github.nurlyan.ritm.SNOOZE",
         A_CARD = "io.github.nurlyan.ritm.CARD", A_CARD_DISMISSED = "io.github.nurlyan.ritm.CARD_DISMISSED",
         A_OPEN = "io.github.nurlyan.ritm.OPEN";
     static final String[][] CHANNELS = {
-        {"day", "Текущий день", "Постоянная карточка с текущим и следующим занятием", "2"},
+        {"now", "Текущее занятие", "Live Update: текущее занятие с отсчётом, без звука", "4"},
+        {"day", "Текущий день", "Ход дня и карточка без текущего занятия", "2"},
         {"activities", "Занятия", "Начало и окончание занятий", "4"},
         {"breaks", "Перерывы", "Перерыв и возвращение к работе", "3"},
         {"diaries", "Дневники", "Напоминания дополнить дневник и оценить эффект", "3"},
@@ -55,7 +56,8 @@ final class Notifier {
             NotificationChannel channel = new NotificationChannel(ch[0], ch[1], Integer.parseInt(ch[3]));
             channel.setDescription(ch[2]);
             channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PRIVATE);
-            if (ch[0].equals("day")) { channel.setShowBadge(false); channel.setSound(null, null); }
+            // The current-activity card sits in a higher-importance channel only to rank above «Ход дня»; it never sounds or pops up.
+            if (ch[0].equals("day") || ch[0].equals("now")) { channel.setShowBadge(false); channel.setSound(null, null); channel.enableVibration(false); }
             nm.createNotificationChannel(channel);
         }
     }
@@ -215,15 +217,19 @@ final class Notifier {
         c.getSystemService(AlarmManager.class).cancel(cardTickIntent(c));
     }
 
+    /**
+     * Category colours for notification bars. Lighter than the app palette on purpose: Android replaces segment colours
+     * that are too dark against the notification background with its own accent, and the day turned uniformly green.
+     */
     static int kindColor(String kind) {
         switch (kind) {
-            case "work": return 0xFF2F7A5F;
-            case "sport": return 0xFF9A7A1F;
-            case "together": return 0xFFA5566F;
-            case "personal": return 0xFF4F76A3;
-            case "meal": return 0xFF7D8150;
-            case "call": return 0xFF2F74A6;
-            case "sleep": return 0xFF6C62A6;
+            case "work": return 0xFF4CC38A;
+            case "sport": return 0xFFE0B23A;
+            case "together": return 0xFFF07FA3;
+            case "personal": return 0xFF74A9F0;
+            case "meal": return 0xFFC4C86A;
+            case "call": return 0xFF4FC3F7;
+            case "sleep": return 0xFFAB9CF5;
             default: return GAP;
         }
     }
@@ -259,6 +265,16 @@ final class Notifier {
             if (!"sleep".equals(x.optString("kind"))) { total++; if (x.optBoolean("actualEnd")) done++; }
         }
         if (cursor < 1470) segs.add(new int[]{1470 - cursor, GAP});
+        // Android draws very short segments as one part in its own accent colour (seen on Android 17: the whole day turned
+        // green), so anything shorter than 45 minutes joins its neighbour; the limit of 15 segments still applies.
+        while (segs.size() > 1) {
+            int k = 0;
+            for (int i = 1; i < segs.size(); i++) if (segs.get(i)[0] < segs.get(k)[0]) k = i;
+            if (segs.get(k)[0] >= 45 && segs.size() <= 15) break;
+            int into = k == 0 ? 1 : k - 1;
+            segs.get(into)[0] += segs.get(k)[0];
+            segs.remove(k);
+        }
         while (segs.size() > 15) {
             int k = 0;
             for (int i = 1; i < segs.size(); i++) if (segs.get(i)[0] < segs.get(k)[0]) k = i;
@@ -266,14 +282,12 @@ final class Notifier {
             segs.get(into)[0] += segs.get(k)[0];
             segs.remove(k);
         }
-        NotificationCompat.ProgressStyle ps = new NotificationCompat.ProgressStyle().setStyledByProgress(true);
+        // Segments keep their category colours across the whole day; the white marker shows the current moment.
+        NotificationCompat.ProgressStyle ps = new NotificationCompat.ProgressStyle().setStyledByProgress(false)
+            .setProgressTrackerIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(c, R.drawable.ic_tracker));
         for (int[] s : segs) ps.addProgressSegment(new NotificationCompat.ProgressStyle.Segment(s[0]).setColor(s[1]));
         int progress = Math.max(0, Math.min(900, m - 570));
         ps.setProgress(progress);
-        if (current != null) {
-            ps.addProgressPoint(new NotificationCompat.ProgressStyle.Point(Math.max(1, Math.min(899, current.optInt("start") - 570))).setColor(kindColor(current.optString("kind"))));
-            ps.addProgressPoint(new NotificationCompat.ProgressStyle.Point(Math.max(1, Math.min(899, current.optInt("end") - 570))).setColor(kindColor(current.optString("kind"))));
-        }
         int left = Math.max(0, 1425 - m);
         NotificationCompat.Builder d = new NotificationCompat.Builder(c, "day")
             .setSmallIcon(R.drawable.ic_stat_ritm)
@@ -281,6 +295,8 @@ final class Notifier {
             .setContentText("Сделано " + done + " из " + total + (left > 0 ? " · до подготовки ко сну " + (left >= 60 ? left / 60 + " ч " : "") + left % 60 + " мин" : ""))
             .setStyle(ps)
             .setOngoing(true).setOnlyAlertOnce(true).setSilent(true).setShowWhen(false)
+            // Older "when" ranks «Ход дня» below the current-activity card, whose "when" is the end of the activity.
+            .setWhen(LocalDate.parse(dayKey).atStartOfDay(MSK).plusMinutes(570).toInstant().toEpochMilli())
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(card.optBoolean("lockDetails") ? NotificationCompat.VISIBILITY_PUBLIC : NotificationCompat.VISIBILITY_PRIVATE)
@@ -358,7 +374,7 @@ final class Notifier {
             title = m >= 1470 ? "Время для сна" : "План на сегодня завершён";
             text = "Отход ко сну 00:30–00:45 · подъём 09:30";
         }
-        NotificationCompat.Builder b = new NotificationCompat.Builder(c, "day")
+        NotificationCompat.Builder b = new NotificationCompat.Builder(c, "now")
             .setSmallIcon(R.drawable.ic_stat_ritm)
             .setContentTitle(title)
             .setContentText(text.replace("\n", " · "))
@@ -399,8 +415,8 @@ final class Notifier {
             b.addAction(0, "Головная боль", openApp(c, 11, route("headache")));
             b.addAction(0, "Самочувствие", openApp(c, 12, route("wellbeing")));
         } else b.addAction(0, "Открыть", openApp(c, 5, action("open", dayKey, null)));
-        try { NotificationManagerCompat.from(c).notify(CARD_ID, b.build()); } catch (SecurityException ignored) {}
         showDayChart(c, card, blocks, dayKey, m, sleepState ? null : current);
+        try { NotificationManagerCompat.from(c).notify(CARD_ID, b.build()); } catch (SecurityException ignored) {}
         if ((live || card.optBoolean("dayChart", true)) && m >= 570 && m < 1470) {
             long nextMinute = (System.currentTimeMillis() / 60000 + 1) * 60000;
             AlarmManager am = c.getSystemService(AlarmManager.class);
