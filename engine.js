@@ -1,5 +1,9 @@
 // Последняя минута дня плана: 02:00 следующих суток. Сам отбой — конец блока «Подготовка ко сну», его можно двигать.
 export const DAY_END=1560;
+// Эмодзи категорий: показываются у занятий без своего эмодзи в начале названия; сохранённые названия не меняются.
+export const KIND_EMOJI={work:'💼',sport:'🏋️',together:'❤️',personal:'🌿',meal:'🍽️',call:'📞',sleep:'😴'};
+export const EMOJI_START=/^(?:\p{Extended_Pictographic}|\p{Emoji_Presentation})(?:\uFE0F|\u200D\p{Extended_Pictographic})*\s*/u;
+export const label=b=>EMOJI_START.test(b?.title||'')?b.title:`${KIND_EMOJI[b?.kind]||'•'} ${b?.title||''}`;
 export const names=['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
 export const short=['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
 export const clock=m=>`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;

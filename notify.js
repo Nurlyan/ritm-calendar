@@ -1,6 +1,6 @@
 // Напоминания и карточка дня. Настройки хранятся на этом устройстве и не синхронизируются между телефонами.
 import * as native from './native.js';
-import {clock,minutes} from './engine.js';
+import {clock,minutes,label} from './engine.js';
 const KEY='ritm-notify-v1',$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const kindNames={work:'Работа',sport:'Спорт',together:'Вместе',personal:'Для себя',meal:'Обед / отдых',call:'Созвон'};
 export const defaults=()=>({enabled:true,card:false,live:true,dayChart:true,lockDetails:false,snoozeMinutes:10,lead:5,endingLead:10,workMinutes:50,breakMinutes:10,morning:'09:35',bedtime:'00:00',evening:'23:30',quietFrom:'00:30',quietTo:'09:30',
@@ -24,16 +24,16 @@ export function buildReminders({dayPlan,today,now=Date.now(),role,health=[],slee
  for(let i=-1;i<days;i++){const day=shift(today,i);
   for(const b of dayPlan(day)){
    // Через 5 минут после конца блока — «Отметьте»: по плану одним нажатием или открыть отметку. Для всех занятий, кроме подготовки ко сну.
-   if(owner&&s.types.mark&&!b.actualEnd&&!b.skipped&&b.kind!=='sleep'){const act=op=>({route:'block',op,date:day,id:b.id});push({key:`mark:${day}:${b.id}`,at:at(day,b.end+5),channel:'activities',title:`Отметьте: ${b.title}`,text:`${clock(b.start)}–${clock(b.end)} · получилось по плану?`,action:act('mark'),buttons:[{title:'По плану',action:act('done')},{title:'Не делал',action:act('skip')}],snooze:false})}
+   if(owner&&s.types.mark&&!b.actualEnd&&!b.skipped&&b.kind!=='sleep'){const act=op=>({route:'block',op,date:day,id:b.id});push({key:`mark:${day}:${b.id}`,at:at(day,b.end+5),channel:'activities',title:`Отметьте: ${label(b)}`,text:`${clock(b.start)}–${clock(b.end)} · получилось по плану?`,action:act('mark'),buttons:[{title:'По плану',action:act('done')},{title:'Не делал',action:act('skip')}],snooze:false})}
    // За 5 и за 1 минуту до конца — «подтвердите»: второе уведомление заменяет первое (общий notifyKey).
-   if(owner&&s.types.confirm&&!b.actualEnd&&!b.skipped&&b.kind!=='sleep'&&b.end-b.start>=10)for(const lead of [5,1]){const act=op=>({route:'block',op,date:day,id:b.id});push({key:`soon${lead}:${day}:${b.id}`,notifyKey:`soon:${day}:${b.id}`,at:at(day,b.end-lead),channel:'activities',title:`Через ${lead} мин конец: ${b.title}`,text:`До ${clock(b.end)}. Подтвердите занятие или возьмите ещё время`,timeoutMin:lead+4,action:act('mark'),buttons:[{title:'Подтвердить',action:act('done')},{title:'Нужно ещё время',action:act('mark')}],snooze:false})}
+   if(owner&&s.types.confirm&&!b.actualEnd&&!b.skipped&&b.kind!=='sleep'&&b.end-b.start>=10)for(const lead of [5,1]){const act=op=>({route:'block',op,date:day,id:b.id});push({key:`soon${lead}:${day}:${b.id}`,notifyKey:`soon:${day}:${b.id}`,at:at(day,b.end-lead),channel:'activities',title:`Через ${lead} мин конец: ${label(b)}`,text:`До ${clock(b.end)}. Подтвердите занятие или возьмите ещё время`,timeoutMin:lead+4,action:act('mark'),buttons:[{title:'Подтвердить',action:act('done')},{title:'Нужно ещё время',action:act('mark')}],snooze:false})}
    if(b.actualEnd||b.skipped||!s.kinds[b.kind==='call'?'call':b.kind])continue;
-   if(s.types.start&&!b.actualStart)push({key:`start:${day}:${b.id}:${b.start}`,at:at(day,b.start-s.lead),channel:'activities',title:s.lead?`Через ${s.lead} мин: ${b.title}`:`Пора: ${b.title}`,text:`${clock(b.start)}–${clock(b.end)} по плану`,route:'today'});
-   if(s.types.ending&&b.end-b.start>s.endingLead)push({key:`end:${day}:${b.id}:${b.end}`,at:at(day,b.end-s.endingLead),channel:'activities',title:`Скоро завершение: ${b.title}`,text:`Блок заканчивается в ${clock(b.end)}`,route:'today'});
+   if(s.types.start&&!b.actualStart)push({key:`start:${day}:${b.id}:${b.start}`,at:at(day,b.start-s.lead),channel:'activities',title:s.lead?`Через ${s.lead} мин: ${label(b)}`:`Пора: ${label(b)}`,text:`${clock(b.start)}–${clock(b.end)} по плану`,route:'today'});
+   if(s.types.ending&&b.end-b.start>s.endingLead)push({key:`end:${day}:${b.id}:${b.end}`,at:at(day,b.end-s.endingLead),channel:'activities',title:`Скоро завершение: ${label(b)}`,text:`Блок заканчивается в ${clock(b.end)}`,route:'today'});
    if(owner&&s.types.breaks&&b.kind==='work'&&s.workMinutes>=15&&s.breakMinutes>=5)
     for(let t=b.start+s.workMinutes;t+s.breakMinutes<=b.end-10;t+=s.workMinutes+s.breakMinutes){
      push({key:`break:${day}:${b.id}:${t}`,at:at(day,t),channel:'breaks',title:'Сделайте перерыв',text:`${s.breakMinutes} мин. Расписание не меняется.`,route:'today'});
-     push({key:`back:${day}:${b.id}:${t}`,at:at(day,t+s.breakMinutes),channel:'breaks',title:'Можно вернуться к работе',text:`${b.title} до ${clock(b.end)}`,route:'today'});
+     push({key:`back:${day}:${b.id}:${t}`,at:at(day,t+s.breakMinutes),channel:'breaks',title:'Можно вернуться к работе',text:`${label(b)} до ${clock(b.end)}`,route:'today'});
     }
   }
   // Утром — закреплённое напоминание «Я проснулся»; висит, пока подъём не отмечен.
@@ -47,7 +47,7 @@ export function buildReminders({dayPlan,today,now=Date.now(),role,health=[],slee
  return out.sort((a,b)=>a.at-b.at).slice(0,300);
 }
 
-function cardDays(dayPlan,today){const days={};for(const d of [shift(today,-1),today,shift(today,1)])days[d]=dayPlan(d).map(b=>({id:b.id,title:b.title,start:b.start,end:b.end,kind:b.kind,locked:Boolean(b.locked),actualStart:Boolean(b.actualStart),actualEnd:Boolean(b.actualEnd),skipped:Boolean(b.skipped),...(/^#[0-9a-f]{6}$/i.test(b.color||'')?{color:b.color}:{})}));return days}
+function cardDays(dayPlan,today){const days={};for(const d of [shift(today,-1),today,shift(today,1)])days[d]=dayPlan(d).map(b=>({id:b.id,title:label(b),start:b.start,end:b.end,kind:b.kind,locked:Boolean(b.locked),actualStart:Boolean(b.actualStart),actualEnd:Boolean(b.actualEnd),skipped:Boolean(b.skipped),...(/^#[0-9a-f]{6}$/i.test(b.color||'')?{color:b.color}:{})}));return days}
 
 let last='';
 /** Передаёт план в Android. Вызывается после загрузки и любых изменений; одинаковые данные повторно не отправляются. */
