@@ -36,7 +36,6 @@ final class Notifier {
         A_CARD = "io.github.nurlyan.ritm.CARD", A_CARD_DISMISSED = "io.github.nurlyan.ritm.CARD_DISMISSED",
         A_OPEN = "io.github.nurlyan.ritm.OPEN";
     static final String[][] CHANNELS = {
-        {"now", "Текущее занятие", "Live Update: текущее занятие с отсчётом, без звука", "4"},
         {"day", "Текущий день", "Ход дня и карточка без текущего занятия", "2"},
         {"activities", "Занятия", "Начало и окончание занятий", "4"},
         {"breaks", "Перерывы", "Перерыв и возвращение к работе", "3"},
@@ -52,12 +51,12 @@ final class Notifier {
     static void ensureChannels(Context c) {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager nm = c.getSystemService(NotificationManager.class);
+        nm.deleteNotificationChannel("now"); // short-lived channel from 1.10.0 test builds
         for (String[] ch : CHANNELS) {
             NotificationChannel channel = new NotificationChannel(ch[0], ch[1], Integer.parseInt(ch[3]));
             channel.setDescription(ch[2]);
             channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PRIVATE);
-            // The current-activity card sits in a higher-importance channel only to rank above «Ход дня»; it never sounds or pops up.
-            if (ch[0].equals("day") || ch[0].equals("now")) { channel.setShowBadge(false); channel.setSound(null, null); channel.enableVibration(false); }
+            if (ch[0].equals("day")) { channel.setShowBadge(false); channel.setSound(null, null); }
             nm.createNotificationChannel(channel);
         }
     }
@@ -295,8 +294,6 @@ final class Notifier {
             .setContentText("Сделано " + done + " из " + total + (left > 0 ? " · до подготовки ко сну " + (left >= 60 ? left / 60 + " ч " : "") + left % 60 + " мин" : ""))
             .setStyle(ps)
             .setOngoing(true).setOnlyAlertOnce(true).setSilent(true).setShowWhen(false)
-            // Older "when" ranks «Ход дня» below the current-activity card, whose "when" is the end of the activity.
-            .setWhen(LocalDate.parse(dayKey).atStartOfDay(MSK).plusMinutes(570).toInstant().toEpochMilli())
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(card.optBoolean("lockDetails") ? NotificationCompat.VISIBILITY_PUBLIC : NotificationCompat.VISIBILITY_PRIVATE)
@@ -374,7 +371,7 @@ final class Notifier {
             title = m >= 1470 ? "Время для сна" : "План на сегодня завершён";
             text = "Отход ко сну 00:30–00:45 · подъём 09:30";
         }
-        NotificationCompat.Builder b = new NotificationCompat.Builder(c, "now")
+        NotificationCompat.Builder b = new NotificationCompat.Builder(c, "day")
             .setSmallIcon(R.drawable.ic_stat_ritm)
             .setContentTitle(title)
             .setContentText(text.replace("\n", " · "))
@@ -415,8 +412,10 @@ final class Notifier {
             b.addAction(0, "Головная боль", openApp(c, 11, route("headache")));
             b.addAction(0, "Самочувствие", openApp(c, 12, route("wellbeing")));
         } else b.addAction(0, "Открыть", openApp(c, 5, action("open", dayKey, null)));
-        showDayChart(c, card, blocks, dayKey, m, sleepState ? null : current);
+        // Seen on Android 17: among Live Updates the earlier-posted card stays on top, and silent updates keep that order.
+        // The current-activity card is therefore posted before «Ход дня»; a fresh start (hideCard) re-creates both in this order.
         try { NotificationManagerCompat.from(c).notify(CARD_ID, b.build()); } catch (SecurityException ignored) {}
+        showDayChart(c, card, blocks, dayKey, m, sleepState ? null : current);
         if ((live || card.optBoolean("dayChart", true)) && m >= 570 && m < 1470) {
             long nextMinute = (System.currentTimeMillis() / 60000 + 1) * 60000;
             AlarmManager am = c.getSystemService(AlarmManager.class);
