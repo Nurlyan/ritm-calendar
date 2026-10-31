@@ -210,7 +210,7 @@ footer span{font-weight:500}
 .is-today>.dayhead strong{color:var(--on-accent);background:var(--accent);border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center}
 .daycol{border-left:1px solid var(--hairline)}
 .is-today{background:color-mix(in srgb,var(--accent) 5%,transparent)}
-.daybody,.ruler-body{height:558px;position:relative}
+.daybody,.ruler-body{height:614px;position:relative}
 .daybody{background:repeating-linear-gradient(to bottom,transparent 0,transparent 36.2px,var(--hairline) 36.2px,var(--hairline) 37.2px)}
 .ruler-body span{position:absolute;left:2px;font-size:.68rem;color:var(--faint);transform:translateY(-6px);font-variant-numeric:tabular-nums}
 .ruler>.dayhead{font-size:.62rem}
@@ -567,3 +567,8 @@ dialog{padding-left:calc(20px + var(--safe-left));padding-right:calc(20px + var(
 .dnd-edit{flex-basis:100%;padding:10px 6px 4px 36px;display:grid;gap:8px}
 .dnd-edit .check{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--ink)}
 .dnd-edit .check input{width:22px;height:22px;min-height:0;accent-color:var(--accent)}
+/* 1.11 · факт в карточке занятия, рекомендованный вариант «понемногу из всех», отбой с началом и концом */
+.fact-check{display:flex;align-items:center;gap:10px;margin:4px 0 2px;font-weight:600;color:var(--ink)}
+.fact-check input{width:22px;height:22px;min-height:0;accent-color:var(--accent)}
+.sacrifice .choice.recommended{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--field))}
+.dnd-bed{align-items:flex-end}

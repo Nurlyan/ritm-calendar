@@ -248,7 +248,13 @@ final class Notifier {
      */
     private static void showDayChart(Context c, JSONObject card, JSONArray blocks, String dayKey, int m, JSONObject current) {
         NotificationManagerCompat nm = NotificationManagerCompat.from(c);
-        if (!card.optBoolean("dayChart", true) || blocks == null || blocks.length() == 0 || m < 570 || m >= 1470
+        // The day ends at bedtime of that day (end of «Подготовка ко сну», may float up to 02:00), not at a fixed 00:30.
+        int dayEnd = 1470, bedStart = 1425;
+        for (int i = 0; blocks != null && i < blocks.length(); i++) {
+            JSONObject x = blocks.optJSONObject(i);
+            if ("sleep".equals(x.optString("kind"))) { dayEnd = Math.min(1560, x.optInt("end")); bedStart = x.optInt("start"); }
+        }
+        if (!card.optBoolean("dayChart", true) || blocks == null || blocks.length() == 0 || m < 570 || m >= dayEnd
             || dayKey.equals(prefs(c).getString("chartDismissed", ""))) { nm.cancel(DAY_ID); return; }
         java.util.List<JSONObject> list = new java.util.ArrayList<>();
         for (int i = 0; i < blocks.length(); i++) list.add(blocks.optJSONObject(i));
@@ -256,14 +262,14 @@ final class Notifier {
         java.util.List<int[]> segs = new java.util.ArrayList<>();
         int cursor = 570, total = 0, done = 0;
         for (JSONObject x : list) {
-            int s = Math.max(cursor, x.optInt("start")), e = Math.min(1470, x.optInt("end"));
+            int s = Math.max(cursor, x.optInt("start")), e = Math.min(dayEnd, x.optInt("end"));
             if (e <= s) continue;
             if (s > cursor) segs.add(new int[]{s - cursor, GAP});
             segs.add(new int[]{e - s, x.optBoolean("skipped") ? GAP : kindColor(x.optString("kind"))});
             cursor = e;
             if (!"sleep".equals(x.optString("kind"))) { total++; if (x.optBoolean("actualEnd")) done++; }
         }
-        if (cursor < 1470) segs.add(new int[]{1470 - cursor, GAP});
+        if (cursor < dayEnd) segs.add(new int[]{dayEnd - cursor, GAP});
         // Android draws very short segments as one part in its own accent colour (seen on Android 17: the whole day turned
         // green), so anything shorter than 45 minutes joins its neighbour; the limit of 15 segments still applies.
         while (segs.size() > 1) {
@@ -285,12 +291,12 @@ final class Notifier {
         NotificationCompat.ProgressStyle ps = new NotificationCompat.ProgressStyle().setStyledByProgress(false)
             .setProgressTrackerIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(c, R.drawable.ic_tracker));
         for (int[] s : segs) ps.addProgressSegment(new NotificationCompat.ProgressStyle.Segment(s[0]).setColor(s[1]));
-        int progress = Math.max(0, Math.min(900, m - 570));
+        int span = dayEnd - 570, progress = Math.max(0, Math.min(span, m - 570));
         ps.setProgress(progress);
-        int left = Math.max(0, 1425 - m);
+        int left = Math.max(0, bedStart - m);
         NotificationCompat.Builder d = new NotificationCompat.Builder(c, "day")
             .setSmallIcon(R.drawable.ic_stat_ritm)
-            .setContentTitle("Ход дня · " + (progress * 100 / 900) + "%")
+            .setContentTitle("Ход дня · " + (progress * 100 / span) + "%")
             .setContentText("Сделано " + done + " из " + total + (left > 0 ? " · до подготовки ко сну " + (left >= 60 ? left / 60 + " ч " : "") + left % 60 + " мин" : ""))
             .setStyle(ps)
             .setOngoing(true).setOnlyAlertOnce(true).setSilent(true).setShowWhen(false)
@@ -416,7 +422,7 @@ final class Notifier {
         // The current-activity card is therefore posted before «Ход дня»; a fresh start (hideCard) re-creates both in this order.
         try { NotificationManagerCompat.from(c).notify(CARD_ID, b.build()); } catch (SecurityException ignored) {}
         showDayChart(c, card, blocks, dayKey, m, sleepState ? null : current);
-        if ((live || card.optBoolean("dayChart", true)) && m >= 570 && m < 1470) {
+        if ((live || card.optBoolean("dayChart", true)) && m >= 570 && m < 1560) {
             long nextMinute = (System.currentTimeMillis() / 60000 + 1) * 60000;
             AlarmManager am = c.getSystemService(AlarmManager.class);
             if (exactAllowed(c)) am.setExact(AlarmManager.RTC, nextMinute, cardTickIntent(c));
