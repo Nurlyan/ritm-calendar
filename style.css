@@ -572,3 +572,16 @@ dialog{padding-left:calc(20px + var(--safe-left));padding-right:calc(20px + var(
 .fact-check input{width:22px;height:22px;min-height:0;accent-color:var(--accent)}
 .sacrifice .choice.recommended{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--field))}
 .dnd-bed{align-items:flex-end}
+/* 1.12 · эмодзи и цвет занятия */
+.pick{border:0;padding:0;margin:4px 0 2px;min-width:0}
+.pick legend{font-size:.88rem;font-weight:650;color:var(--ink-2);margin-bottom:8px;padding:0}
+.emoji-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px}
+.emoji-btn{min-height:42px;padding:0;font-size:1.3rem;border-radius:12px;background:var(--field);border:1px solid var(--field-edge);box-shadow:none}
+.emoji-btn.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--field))}
+.color-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.swatch{position:relative;display:block;margin:0}
+.swatch input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;min-height:0;cursor:pointer}
+.swatch span{display:block;width:36px;height:36px;border-radius:50%;border:2px solid transparent;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.swatch.auto span{width:auto;height:36px;padding:0 12px;border-radius:18px;display:flex;align-items:center;font-size:.82rem;font-weight:650;background:var(--field);border-color:var(--field-edge);color:var(--ink-2)}
+.swatch input:checked+span{border-color:var(--ink);box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--ink)}
+.swatch input:focus-visible+span{outline:3px solid var(--focus);outline-offset:2px}

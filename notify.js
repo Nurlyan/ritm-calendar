@@ -47,7 +47,7 @@ export function buildReminders({dayPlan,today,now=Date.now(),role,health=[],slee
  return out.sort((a,b)=>a.at-b.at).slice(0,300);
 }
 
-function cardDays(dayPlan,today){const days={};for(const d of [shift(today,-1),today,shift(today,1)])days[d]=dayPlan(d).map(b=>({id:b.id,title:b.title,start:b.start,end:b.end,kind:b.kind,locked:Boolean(b.locked),actualStart:Boolean(b.actualStart),actualEnd:Boolean(b.actualEnd),skipped:Boolean(b.skipped)}));return days}
+function cardDays(dayPlan,today){const days={};for(const d of [shift(today,-1),today,shift(today,1)])days[d]=dayPlan(d).map(b=>({id:b.id,title:b.title,start:b.start,end:b.end,kind:b.kind,locked:Boolean(b.locked),actualStart:Boolean(b.actualStart),actualEnd:Boolean(b.actualEnd),skipped:Boolean(b.skipped),...(/^#[0-9a-f]{6}$/i.test(b.color||'')?{color:b.color}:{})}));return days}
 
 let last='';
 /** Передаёт план в Android. Вызывается после загрузки и любых изменений; одинаковые данные повторно не отправляются. */

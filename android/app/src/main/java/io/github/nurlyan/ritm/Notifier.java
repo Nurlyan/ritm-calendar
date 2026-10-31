@@ -233,6 +233,13 @@ final class Notifier {
         }
     }
 
+    /** A colour chosen for the activity in the app (#rrggbb) wins over the category colour. */
+    static int blockColor(JSONObject x) {
+        String c = x.optString("color", "");
+        if (c.matches("#[0-9a-fA-F]{6}")) return 0xFF000000 | Integer.parseInt(c.substring(1), 16);
+        return kindColor(x.optString("kind"));
+    }
+
     private static PendingIntent cardDismissIntent(Context c, String dayKey) {
         return PendingIntent.getBroadcast(c, 2, new Intent(c, ReminderReceiver.class).setAction(A_CARD_DISMISSED).putExtra("day", dayKey), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
@@ -265,7 +272,7 @@ final class Notifier {
             int s = Math.max(cursor, x.optInt("start")), e = Math.min(dayEnd, x.optInt("end"));
             if (e <= s) continue;
             if (s > cursor) segs.add(new int[]{s - cursor, GAP});
-            segs.add(new int[]{e - s, x.optBoolean("skipped") ? GAP : kindColor(x.optString("kind"))});
+            segs.add(new int[]{e - s, x.optBoolean("skipped") ? GAP : blockColor(x)});
             cursor = e;
             if (!"sleep".equals(x.optString("kind"))) { total++; if (x.optBoolean("actualEnd")) done++; }
         }
@@ -399,7 +406,7 @@ final class Notifier {
         if (live && current != null && !sleepState) {
             int start = current.optInt("start"), end = current.optInt("end"), len = Math.max(1, end - start), done = Math.max(0, Math.min(len, m - start));
             NotificationCompat.ProgressStyle ps = new NotificationCompat.ProgressStyle().setStyledByProgress(true)
-                .addProgressSegment(new NotificationCompat.ProgressStyle.Segment(len).setColor(kindColor(current.optString("kind"))))
+                .addProgressSegment(new NotificationCompat.ProgressStyle.Segment(len).setColor(blockColor(current)))
                 .setProgress(done);
             if (len > 10) ps.addProgressPoint(new NotificationCompat.ProgressStyle.Point(len - 5).setColor(WARN));
             if (len > 3) ps.addProgressPoint(new NotificationCompat.ProgressStyle.Point(len - 1).setColor(WARN));
