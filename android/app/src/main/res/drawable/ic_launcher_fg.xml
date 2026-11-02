@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The "ритм" spark, kept inside the 66dp adaptive-icon safe zone. Also used as the themed (monochrome) icon. -->
+<!-- The "ритм" pulse line (same mark as favicon.svg), kept inside the 66dp adaptive-icon safe zone. Also used as the themed (monochrome) icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFFFFFFF" android:pathData="M54,30Q57.2,50.8 78,54Q57.2,57.2 54,78Q50.8,57.2 30,54Q50.8,50.8 54,30Z" />
-    <path android:fillColor="#B3FFFFFF" android:pathData="M72,31Q73,36 78,37Q73,38 72,43Q71,38 66,37Q71,36 72,31Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="5"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M31.8,57H42.6L48.6,36.6L58.2,71.4L65.4,49.8H76.2" />
 </vector>

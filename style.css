@@ -5,7 +5,7 @@
 :root{
  color-scheme:light;
  --bg:#edf2ee;--blob1:#d4e8dc;--blob2:#f3e6da;--blob3:#dbe4f1;
- --ink:#17271f;--ink-2:#3e5148;--muted:#5b6c63;--faint:#8a9890;
+ --ink:#17271f;--ink-2:#3e5148;--muted:#5b6c63;--faint:#5f6e67;
  --glass:rgba(255,255,255,.58);--glass-strong:rgba(255,255,255,.86);--glass-edge:rgba(255,255,255,.9);--glass-bar:rgba(246,250,247,.72);
  --hairline:rgba(23,39,31,.09);--field:rgba(255,255,255,.78);--field-edge:rgba(23,39,31,.14);
  --shadow:0 1px 2px rgba(23,45,34,.05),0 10px 30px rgba(23,45,34,.08);--shadow-lg:0 30px 80px rgba(16,36,27,.22);--highlight:inset 0 1px 0 rgba(255,255,255,.85);
@@ -605,3 +605,23 @@ dialog{padding-left:calc(20px + var(--safe-left));padding-right:calc(20px + var(
 .hero-actions{flex-wrap:wrap}
 .hero-actions button{min-width:0}
 @media (max-width:440px){.hero-actions:has(>button:nth-child(3))>button:first-child{flex-basis:100%}}
+/* 1.14 · дизайн-проверка (avoid-ai-design): разный вес поверхностей, без цветных полосок и капса */
+/* 4. Тень — только у того, что парит: карточка «Сейчас», окна, панели. Остальные карточки плоские. */
+.glass,.card{box-shadow:var(--highlight)}
+.quick button,.metric,.anchor{box-shadow:none}
+.hero{box-shadow:var(--shadow),var(--highlight)}
+/* Панели внутри окна занятия — разделы с линией, а не карточки в карточке */
+.mark-panel{background:none;border:0;border-top:1px solid var(--hairline);border-radius:0;padding:14px 0 4px;margin:14px 0 2px}
+/* 5. Подписи над заголовками — обычным регистром */
+.eyebrow{text-transform:none;letter-spacing:0;font-size:.86rem;font-weight:650}
+/* 6. Категория — фоном и тонкой рамкой её цвета, без полоски слева */
+.event{border:1px solid color-mix(in srgb,var(--k) 45%,transparent)}
+.dnd-item{border-left:1px solid var(--field-edge);background:color-mix(in srgb,var(--k,var(--accent)) 10%,var(--field))}
+/* 2. Точка категории в календаре вместо второго значка */
+.agenda-dot{flex:none;width:12px;height:12px;border-radius:50%;background:var(--k,var(--accent));box-shadow:0 0 0 4px var(--kb,transparent);margin:0 4px}
+/* 3. Кнопки в шапках карточек — в одну строку; при нехватке места уходят под заголовок */
+.card-head{flex-wrap:wrap;row-gap:2px}
+.card-actions{flex-wrap:nowrap;gap:10px}
+.card-actions .text-button,.agenda-head .text-button{white-space:nowrap}
+/* 7. Знак пульса — линия потолще */
+.brandmark .ico{stroke-width:2.4}
