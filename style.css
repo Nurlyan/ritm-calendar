@@ -585,3 +585,23 @@ dialog{padding-left:calc(20px + var(--safe-left));padding-right:calc(20px + var(
 .swatch.auto span{width:auto;height:36px;padding:0 12px;border-radius:18px;display:flex;align-items:center;font-size:.82rem;font-weight:650;background:var(--field);border-color:var(--field-edge);color:var(--ink-2)}
 .swatch input:checked+span{border-color:var(--ink);box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--ink)}
 .swatch input:focus-visible+span{outline:3px solid var(--focus);outline-offset:2px}
+/* 1.13 · дела внутри занятия */
+.deeds-line{display:block;margin-top:3px;font-size:.8rem;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero .deeds-line{margin:10px 0 0;font-size:.88rem;white-space:normal}
+.deeds-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.deeds-head h3{margin:0}
+.deeds-head button{min-height:40px;padding:6px 14px}
+.deeds-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.deeds-list li{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;background:var(--field);border:1px solid var(--field-edge)}
+.deeds-list li span{font-weight:650;min-width:0;overflow-wrap:anywhere}
+.deeds-list time{color:var(--muted);font-size:.84rem;white-space:nowrap}
+.deed-del{min-height:36px;min-width:36px;padding:0}
+.deed-row{display:flex;flex-wrap:wrap;gap:8px}
+.deed-row .chip-btn{flex-direction:row;min-height:42px}
+.sacrifice .pick-choice{cursor:pointer;border:1px solid var(--field-edge);background:var(--field)}
+.sacrifice .pick-choice input{width:22px;height:22px;min-height:0;flex:none;margin:0;accent-color:var(--accent)}
+.sacrifice .pick-choice:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--field))}
+/* Три кнопки в карточке «Сейчас»: главная во всю ширину, «Дело» и «Изменить» — рядом под ней на узких экранах. */
+.hero-actions{flex-wrap:wrap}
+.hero-actions button{min-width:0}
+@media (max-width:440px){.hero-actions:has(>button:nth-child(3))>button:first-child{flex-basis:100%}}

@@ -19,7 +19,9 @@ export function base(day){const rows=[];const a=(title,start,end,kind)=>rows.pus
  if(day===5){a('Работа / свои проекты',600,810,'work');a('Обед',810,870,'meal');a('Зал / велосипед',870,990,'sport');a('Личные проекты',990,1110,'work');a('Игры и свои дела',1110,1200,'personal');a('Вечер вместе',1200,1425,'together')}
  if(day===6){a('Свободное воскресенье',600,840,'personal');a('Неспешный обед',840,900,'meal');a('Отдых и любимые дела',900,1200,'personal');a('Вечер вместе',1200,1425,'together')}
  a('Подготовка ко сну',1425,1470,'sleep');return rows.map(b=>({...b,locked:b.kind==='call'}))}
-export function validate(blocks,day){if(!Array.isArray(blocks)||blocks.length>40)throw Error('Некорректный план');let end=570;const ids=new Set();for(const b of [...blocks].sort((a,b)=>a.start-b.start)){if(ids.has(b.id)||!Number.isInteger(b.start)||!Number.isInteger(b.end)||b.start<end||b.end<=b.start||b.end>DAY_END||!b.title?.trim()||b.title.length>100||!['work','meal','sport','personal','together','sleep','call'].includes(b.kind)||(b.color!==undefined&&!/^#[0-9a-f]{6}$/i.test(b.color)))throw Error('Занятия пересекаются или выходят за границы 09:30–02:00');ids.add(b.id);end=b.end}const call=blocks.filter(b=>b.kind==='call');if(day===1&&(call.length!==1||call[0].start!==1200||call[0].end!==1280||!call[0].locked))throw Error('Созвон закреплён на вторник 20:00–21:20');if(day!==1&&call.length)throw Error('Созвон доступен только во вторник')}
+// Дела внутри занятия («что ещё делал»): до 30 записей {id,title,start,end}, время — минуты дня плана.
+const okItems=items=>items===undefined||(Array.isArray(items)&&items.length<=30&&items.every(i=>i&&typeof i.id==='string'&&i.title?.trim()&&i.title.length<=60&&Number.isInteger(i.start)&&Number.isInteger(i.end)&&i.start>=570&&i.end<=DAY_END&&i.end>i.start));
+export function validate(blocks,day){if(!Array.isArray(blocks)||blocks.length>40)throw Error('Некорректный план');let end=570;const ids=new Set();for(const b of [...blocks].sort((a,b)=>a.start-b.start)){if(ids.has(b.id)||!Number.isInteger(b.start)||!Number.isInteger(b.end)||b.start<end||b.end<=b.start||b.end>DAY_END||!b.title?.trim()||b.title.length>100||!['work','meal','sport','personal','together','sleep','call'].includes(b.kind)||(b.color!==undefined&&!/^#[0-9a-f]{6}$/i.test(b.color))||!okItems(b.items))throw Error('Занятия пересекаются или выходят за границы 09:30–02:00');ids.add(b.id);end=b.end}const call=blocks.filter(b=>b.kind==='call');if(day===1&&(call.length!==1||call[0].start!==1200||call[0].end!==1280||!call[0].locked))throw Error('Созвон закреплён на вторник 20:00–21:20');if(day!==1&&call.length)throw Error('Созвон доступен только во вторник')}
 // Earlier events stay in place. Later events use remaining gaps; the call and bedtime preparation never move.
 // Overflow is explicitly deferred rather than silently dropped or pushed into sleep.
 export function reflow(blocks,id,start,duration,patch={}){
@@ -47,6 +49,33 @@ const limitOf=fixed=>Math.min(DAY_END,...fixed.filter(b=>b.kind==='sleep').map(b
 function place(seq,fixed,cursor){const placed=[],deferred=[],limit=limitOf(fixed);for(const b of seq){const len=b.end-b.start,s=clear(cursor,len,fixed);if(s+len>limit){deferred.push(b);continue}placed.push({...b,start:s,end:s+len});cursor=s+len}return {placed,deferred}}
 const fixedOf=(blocks,pinned)=>blocks.filter(b=>b.locked||b.kind==='sleep'||pinned.includes(b.id));
 const minutesOf=list=>list.reduce((n,b)=>n+b.end-b.start,0);
+// Дело внутри занятия. shift=false — только записать, план прежний; shift=true — время ушло на дело: занятие длиннее на столько же, следующие съезжают.
+export function addItem(blocks,id,item,shift=false){
+ const b=blocks.find(x=>x.id===id);if(!b)throw Error('Занятие не найдено');
+ const title=(item.title||'').trim();if(!title)throw Error('Напишите, что делали');
+ if(!Number.isInteger(item.start)||!Number.isInteger(item.end)||item.end<=item.start||item.start<570||item.end>DAY_END)throw Error('Время дела — в пределах 09:30–02:00, конец позже начала');
+ if((b.items||[]).length>=30)throw Error('В занятии уже 30 дел');
+ const items=[...(b.items||[]),{id:item.id||crypto.randomUUID(),title:title.slice(0,60),start:item.start,end:item.end}].sort((x,y)=>x.start-y.start);
+ if(!shift)return {blocks:blocks.map(x=>x.id===id?{...x,items}:x),deferred:[]};
+ return reflow(blocks,id,b.start,b.end-b.start+item.end-item.start,{items});
+}
+// Закончил раньше: следующие занятия начинаются раньше на освободившееся время — до первого закреплённого, уже начатого или подготовки ко сну. Окна между занятиями сохраняются.
+export function pullForward(blocks,id,end){
+ const list=structuredClone(blocks).sort((a,b)=>a.start-b.start),b=list.find(x=>x.id===id);
+ if(!b||end<=b.start||end>=b.end)throw Error('Окончание должно быть раньше плана');
+ const old=b.end;b.end=end;let delta=old-end,cursor=end,moved=0;
+ for(const x of list.filter(x=>x!==b&&x.start>=old)){if(x.locked||x.kind==='sleep'||x.actualStart)break;const d=Math.min(delta,x.start-cursor);if(d<=0)break;x.start-=d;x.end-=d;cursor=x.end;delta=d;moved++}
+ return {blocks:list,moved};
+}
+// Новое занятие поверх идущего: идущее прерывается; resume — его остаток продолжается сразу после нового, следующие занятия съезжают.
+export function insertBlock(blocks,nb,{resume=true}={}){
+ const list=structuredClone(blocks),cur=list.find(b=>b.start<nb.start&&b.end>nb.start);let rest=0;
+ if(cur){if(cur.locked||cur.kind==='sleep')throw Error(cur.locked?'Это время занято созвоном':'Это время подготовки ко сну');rest=cur.end-nb.start;cur.end=nb.start}
+ list.push(nb);
+ // Остаток ставим с тем же началом, что у нового: при раскладке он встанет сразу за ним.
+ if(cur&&resume&&rest>=5){const {actualStart,actualEnd,skipped,items,...plain}=cur;list.push({...plain,id:crypto.randomUUID(),start:nb.start,end:nb.start+rest})}
+ return {...reflow(list,nb.id,nb.start,nb.end-nb.start),cut:cur?{title:cur.title,rest,resumed:resume&&rest>=5}:null};
+}
 export function swapDays(wed,thu){return [structuredClone(thu).map(b=>({...b,id:crypto.randomUUID()})),structuredClone(wed).map(b=>({...b,id:crypto.randomUUID()}))]}
 // Day editor: movable blocks follow each other in the chosen order starting at `from`.
 // A block with `at` (start set by hand) starts there: later than the previous block leaves a gap, earlier shortens
@@ -89,8 +118,9 @@ export function squeezeAll(blocks,deferred,{from=0,pinned=[],min=15}={}){
  const lay=cuts=>{const r=place(flex.map((b,i)=>({...b,end:b.end-cuts[i]})),fixed,cursor),bl=[...keep,...r.placed,...fixed].sort((a,b)=>a.start-b.start);return {blocks:bl,deferred:r.deferred,left:overrun(bl,r.deferred,{pinned})}};
  const zero=flex.map(()=>0),first=lay(zero);if(!first.left&&!first.deferred.length)return {...first,cut:0,count:flex.length};
  const need=first.left,room=flex.map(b=>Math.max(0,b.end-b.start-min)),total=room.reduce((a,b)=>a+b,0);if(!total)return null;
- const take=Math.min(need,total),cuts=room.map(r=>Math.floor(take*r/total));
- for(let rest=take-cuts.reduce((a,b)=>a+b,0),i=0;rest>0&&i<flex.length*take;i++){const j=i%flex.length;if(cuts[j]<room[j]){cuts[j]++;rest--}}
+ // Сокращаем кратно 5 минутам, чтобы время занятий оставалось круглым (15:05, а не 15:01).
+ const step=5,take=Math.min(Math.ceil(need/step)*step,total),cuts=room.map(r=>Math.min(r,Math.floor(take*r/total/step)*step));
+ for(let rest=take-cuts.reduce((a,b)=>a+b,0),i=0;rest>0&&i<flex.length*take;i++){const j=i%flex.length,d=Math.min(step,rest,room[j]-cuts[j]);if(d>0){cuts[j]+=d;rest-=d}}
  let best=lay(cuts);for(let extra=1;best.left&&extra<=total-take;extra++){const more=[...cuts];let add=extra;for(let j=0;add>0&&j<flex.length;j++){const d=Math.min(add,room[j]-more[j]);more[j]+=d;add-=d}const r=lay(more);if(r.left<best.left)best=r;if(!r.left)break}
  return {...best,cut:cuts.reduce((a,b)=>a+b,0),count:flex.length};
 }
